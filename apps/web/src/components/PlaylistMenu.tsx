@@ -28,6 +28,9 @@ export function PlaylistMenu({ song }: { readonly song: UnifiedSong }) {
   const closeRef = useRef<HTMLButtonElement | null>(null);
   const sheetRef = useRef<HTMLDivElement | null>(null);
 
+  // Capture the invoking button before the close control takes focus.
+  useFocusTrap(open, sheetRef);
+
   useEffect(() => {
     if (!open) return undefined;
     closeRef.current?.focus();
@@ -40,10 +43,6 @@ export function PlaylistMenu({ song }: { readonly song: UnifiedSong }) {
     window.addEventListener('keydown', onKeyDown, true);
     return () => window.removeEventListener('keydown', onKeyDown, true);
   }, [open]);
-
-  // Runs after the effect above, so the close-button autofocus already happened by
-  // the time this checks for it; it only adds the Tab cycle and focus-restore-on-close.
-  useFocusTrap(open, sheetRef);
 
   const submit = async (event: FormEvent): Promise<void> => {
     event.preventDefault();

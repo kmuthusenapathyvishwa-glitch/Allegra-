@@ -78,11 +78,24 @@ plain('an opened album separates hover, playback, likes, and playlist membership
 
   await page.goto('/');
   const notNow = page.getByRole('button', { name: /^(Not now|Skip for now)$/ });
-  if (await notNow.count()) await notNow.first().click();
+  await expect(notNow.first()).toBeVisible({ timeout: 30_000 });
+  await notNow.first().click();
   await page.getByRole('button', { name: 'Search music' }).first().click();
   await page.getByRole('combobox').fill('Fixture');
   await expect(page.getByRole('option').first()).toBeVisible({ timeout: 20_000 });
   await page.getByRole('option').first().click();
+  const playlistInvoker = page.getByRole('button', { name: /(?:Add|Save) North Window to (?:the queue or a playlist|a playlist)/ }).first();
+  await playlistInvoker.click();
+  const songSheet = page.getByRole('dialog', { name: /^(Add to queue or playlist|Save to playlist)$/ });
+  await expect(songSheet).toBeVisible();
+  await songSheet.getByRole('button', { name: 'Close', exact: true }).click();
+  await expect(songSheet).toBeHidden();
+  await expect(playlistInvoker).toBeFocused();
+  await playlistInvoker.press('Enter');
+  await expect(songSheet).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(songSheet).toBeHidden();
+  await expect(playlistInvoker).toBeFocused();
   await page.getByRole('button', { name: 'Open album Quiet Satellites' }).click();
   await expect(page.locator('.album-page')).toBeVisible();
   await expect(page.locator('.album-track')).toHaveCount(3);
@@ -166,6 +179,7 @@ plain('an opened album separates hover, playback, likes, and playlist membership
   await expect(secondRow).toHaveAttribute('data-playing', 'true');
 
   const viewports = [
+    { width: 320, height: 740, name: '320' },
     { width: 360, height: 800, name: '360' },
     { width: 768, height: 900, name: '768' },
     { width: 1280, height: 860, name: '1280' },
@@ -177,6 +191,19 @@ plain('an opened album separates hover, playback, likes, and playlist membership
     await page.screenshot({ path: testInfo.outputPath(`album-after-${viewport.name}.png`) });
     const hasHorizontalOverflow = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth);
     expect(hasHorizontalOverflow, `album has horizontal overflow at ${viewport.width}px`).toBe(false);
+    if (viewport.width <= 480) {
+      const player = page.locator(bar);
+      const bounds = await player.boundingBox();
+      expect(bounds).not.toBeNull();
+      const controls = player.locator('button:visible, input:visible');
+      for (const control of await controls.all()) {
+        const rect = await control.boundingBox();
+        expect(rect).not.toBeNull();
+        expect(rect!.x).toBeGreaterThanOrEqual(bounds!.x);
+        expect(rect!.x + rect!.width).toBeLessThanOrEqual(bounds!.x + bounds!.width);
+      }
+      expect((await player.locator('.am-meta').boundingBox())!.width).toBeGreaterThan(80);
+    }
     if (viewport.width <= 640) await expect(page.locator('.album-toolbar__save > svg')).toBeVisible();
     const savePlaylist = await page.getByRole('button', { name: 'Save as playlist' }).boundingBox();
     const playerBar = await page.locator(bar).boundingBox();
