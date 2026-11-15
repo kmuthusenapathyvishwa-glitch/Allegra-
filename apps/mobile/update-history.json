@@ -1,6 +1,18 @@
 {
   "entries": [
     {
+      "version": "1.69.2",
+      "description": "A small tidy-up inside the app. Nothing looks different",
+      "changelog": [
+        {
+          "title": "Improved",
+          "items": [
+            "Removed leftover code the app no longer uses"
+          ]
+        }
+      ]
+    },
+    {
       "version": "1.69.1",
       "description": "Large display size keeps the full screen and bottom navigation visible",
       "changelog": [
@@ -10,7 +22,9 @@
             "Large display size no longer cuts off the right edge or bottom navigation on affected phones"
           ]
         }
-      ]
+      ],
+      "sourceCommit": "c2ca5e7a50d974678d7707b3df1374bb1843b9fa",
+      "rollbackAsset": "LuvLyrics-rollback-1.69.1.apk"
     },
     {
       "version": "1.69.0",
@@ -61,23 +75,6 @@
       ],
       "sourceCommit": "65e90b5756edbc4c177e4613ae3479021fa691e0",
       "rollbackAsset": "LuvLyrics-rollback-1.68.2.apk"
-    },
-    {
-      "version": "1.68.1",
-      "sourceCommit": "de9f2675da5227ae31d86e3a5d118531e34d1b5e",
-      "rollbackAsset": "LuvLyrics-rollback-1.68.1.apk",
-      "description": "Search can retry when the catalog cannot be reached, and small buttons are easier to tap",
-      "changelog": [
-        {
-          "title": "Improved",
-          "items": [
-            "Search tells you when the catalog cannot be reached, with a Try again button",
-            "The close button on the info card works",
-            "Small buttons are easier to tap, including the info buttons and filter chips",
-            "Text in Search and the Now Playing controls no longer gets cut off at larger sizes"
-          ]
-        }
-      ]
     }
   ]
 }
