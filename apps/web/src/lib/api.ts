@@ -73,10 +73,6 @@ function retryAfterOf(response: Response): number | undefined {
   return Number.isFinite(date) ? Math.max(0, (date - Date.now()) / 1000) : undefined;
 }
 
-export function apiBaseUrl(): string {
-  return API_BASE_URL;
-}
-
 export function resolveApiUrl(path: string): string {
   if (/^(https?:|blob:|data:)/.test(path)) return path;
   const normalized = path.replace(/^\/+/, '');
@@ -366,18 +362,6 @@ export async function fetchLikedSongs(signal?: AbortSignal): Promise<UnifiedSong
   return request('/api/me/liked', { signal });
 }
 
-export async function setLikedSong(songId: string, liked: boolean): Promise<void> {
-  if (liked) {
-    await request('/api/me/liked', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ songId })
-    });
-    return;
-  }
-  await requestWithoutBody(`/api/me/liked/${encodeURIComponent(songId)}`, { method: 'DELETE' });
-}
-
 export async function fetchRecentlyPlayed(signal?: AbortSignal): Promise<UnifiedSong[]> {
   return request('/api/me/recently-played', { signal });
 }
@@ -470,14 +454,6 @@ export async function createLibrary(name: string): Promise<LibraryRecord> {
 
 export async function deleteLibrary(libraryId: string): Promise<void> {
   await requestWithoutBody(`/api/libraries/${encodeURIComponent(libraryId)}`, { method: 'DELETE' });
-}
-
-export async function addSongToLibrary(libraryId: string, songId: string): Promise<LibraryRecord> {
-  return request(`/api/libraries/${encodeURIComponent(libraryId)}/songs`, { method: 'POST', headers: JSON_HEADERS, body: JSON.stringify({ songId }) });
-}
-
-export async function removeSongFromLibrary(libraryId: string, songId: string): Promise<LibraryRecord> {
-  return request(`/api/libraries/${encodeURIComponent(libraryId)}/songs/${encodeURIComponent(songId)}`, { method: 'DELETE' });
 }
 
 export interface CoverUploadSign {

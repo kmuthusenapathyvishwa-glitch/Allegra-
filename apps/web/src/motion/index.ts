@@ -70,16 +70,6 @@ export const motionTokens = {
   stagger: 0.04
 } as const;
 
-/** Imperative GSAP moments use the same timing vocabulary as Motion scenes. */
-export const gsapTokens = {
-  hero: {
-    duration: motionTokens.duration.cinematic,
-    delay: motionTokens.duration.instant,
-    stagger: 0.05,
-    ease: 'power4.out',
-    distance: 24
-  }
-} as const;
 
 export const spring = {
   tactile: { type: 'spring', stiffness: 400, damping: 30 } as const,
@@ -154,23 +144,12 @@ export const exitUp = {
   transition: { duration: motionTokens.duration.fast, ease: motionTokens.ease.accelerate }
 } as const;
 
-/** Leaving object: sinks back down into the light. */
-export const exitDown = {
-  opacity: 0,
-  y: 22,
-  scale: 0.96,
-  transition: { duration: motionTokens.duration.base, ease: motionTokens.ease.accelerate }
-} as const;
-
 /** Content swapping inside a container that stays put. */
 export const swapVariants: Variants = {
   hidden: { opacity: 0, y: 12 },
   visible: { opacity: 1, y: 0, transition: { duration: motionTokens.duration.base, ease: motionTokens.ease.decelerate } },
   exit: { opacity: 0, y: -10, transition: { duration: motionTokens.duration.fast, ease: motionTokens.ease.accelerate } }
 };
-
-/** A tapped control confirms within this window, independent of any network call. */
-export const ACK_MS = 120;
 
 /**
  * The Blend reveal, played in the hero itself: orbs start far apart and spring to the distance

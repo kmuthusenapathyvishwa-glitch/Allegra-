@@ -81,7 +81,7 @@ export async function runMatching(input: {
       // indexes in bounded smaller requests; after that they remain visible/skippable and are
       // tagged so a later explicit rematch can distinguish them from a genuine catalog miss.
       let finalReplies = [...(replies ?? [])];
-      let pending = keys.flatMap((key, index) => finalReplies.find((reply) => reply.index === index)?.retryable ? [index] : []);
+      let pending = keys.flatMap((_key, index) => finalReplies.find((reply) => reply.index === index)?.retryable ? [index] : []);
       for (let attempt = 0; pending.length > 0 && attempt < TRANSIENT_RESULT_RETRIES; attempt += 1) {
         if (input.signal.aborted) return;
         await sleep(500 * (attempt + 1));
@@ -93,7 +93,7 @@ export async function runMatching(input: {
             const updated = retry.find((reply) => reply.index === retryIndex);
             if (updated) finalReplies[originalIndex] = { ...updated, index: originalIndex };
           }
-          pending = keys.flatMap((key, index) => finalReplies.find((reply) => reply.index === index)?.retryable ? [index] : []);
+          pending = keys.flatMap((_key, index) => finalReplies.find((reply) => reply.index === index)?.retryable ? [index] : []);
         } catch (error) {
           if (input.signal.aborted) return;
           const failure = (typeof error === 'object' && error !== null ? error : {}) as SendFailure;
