@@ -43,8 +43,11 @@ link "lyricflow://diagnose"
 sleep 2
 # A song with no canvas video (the report is about those; a looping video also keeps uiautomator from ever
 # reading the screen). The style link switches the video off too on builds that know `canvas=`.
+# The same goes for every animation that never settles: the shader behind the app, the mini player's glow and the
+# player's glow once lyrics open. uiautomator needs an idle screen to dump, so the probe uses still looks (the launch
+# check does the same with appBackground=glass). The lyric glide itself still runs in section B.
 PROBE_QUERY="${PROBE_QUERY:-Ucha%20Lamba%20Kad%20Anand%20Raaj%20Anand}"
-link "lyricflow://style?canvas=0"
+link "lyricflow://style?canvas=0&appBackground=glass&miniPlayerBackground=black&playerBackground=apple"
 sleep 1
 
 # -- A. A streamed song, Now Playing left open on the cover ---------------------------------------------------
