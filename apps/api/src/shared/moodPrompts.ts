@@ -1,6 +1,8 @@
+// GENERATED from packages/shared/moodPrompts.ts by `npm run sync:shared`. Do not edit here.
 /** Calm defaults when there is no signed-in taste yet. Never leave the chip row empty. */
 export const GUEST_MOOD_PROMPTS = ['late night', 'soft focus', 'golden hour', 'focus flow'] as const;
 
+/** The part of a taste summary the chips need. The web and API summaries both satisfy it. */
 export interface MoodTasteInput {
   readonly topArtists: readonly { readonly name: string; readonly score: number }[];
   readonly languages: readonly { readonly name: string; readonly score: number }[];
@@ -52,12 +54,15 @@ function languageChip(name: string): string | null {
 function artistChip(name: string): string {
   const clean = name.trim();
   if (!clean) return 'artist radio';
+  // Short first token reads better as a mood chip than a full credited string.
   const first = clean.split(/\s+/)[0] ?? clean;
   return `${first} radio`;
 }
 
 /**
- * Derive 3-6 search chips from taste. Guests / not-onboarded -> calm static defaults.
+ * Derive 3-6 search chips from a taste summary.
+ * Prefer languages, then artists, then a gentle time-of-day cue.
+ * Guests / not-onboarded / empty taste -> calm static defaults.
  */
 export function deriveMoodPrompts(taste: MoodTasteInput | null | undefined, now = new Date()): string[] {
   if (!taste || !taste.onboarded) {
@@ -88,6 +93,7 @@ export function deriveMoodPrompts(taste: MoodTasteInput | null | undefined, now 
 
   push(timeOfDayChip(now));
 
+  // Soft fillers so the row never looks sparse after partial taste.
   for (const fallback of GUEST_MOOD_PROMPTS) {
     if (chips.length >= 4) break;
     push(fallback);

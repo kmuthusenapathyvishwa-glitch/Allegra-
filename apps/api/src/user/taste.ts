@@ -1,4 +1,4 @@
-import { deriveMoodPrompts } from './moodPrompts.js';
+import { deriveMoodPrompts } from '../shared/moodPrompts.js';
 import type { TasteEntry, TasteProfile } from './store.js';
 import { creditedArtists } from '../shared/identity.js';
 import { LONG_TERM_WEIGHT, listenVerdict, type ListenExit } from '../shared/listenSignal.js';

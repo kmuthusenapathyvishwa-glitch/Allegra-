@@ -1,7 +1,12 @@
-import type { TasteSummary } from './types.js';
-
 /** Calm defaults when there is no signed-in taste yet. Never leave the chip row empty. */
 export const GUEST_MOOD_PROMPTS = ['late night', 'soft focus', 'golden hour', 'focus flow'] as const;
+
+/** The part of a taste summary the chips need. The web and API summaries both satisfy it. */
+export interface MoodTasteInput {
+  readonly topArtists: readonly { readonly name: string; readonly score: number }[];
+  readonly languages: readonly { readonly name: string; readonly score: number }[];
+  readonly onboarded: boolean;
+}
 
 const LANGUAGE_CHIPS: Record<string, readonly string[]> = {
   hindi: ['Hindi essentials', 'Bollywood nights'],
@@ -54,11 +59,11 @@ function artistChip(name: string): string {
 }
 
 /**
- * Derive 3-6 search chips from a TasteSummary.
+ * Derive 3-6 search chips from a taste summary.
  * Prefer languages, then artists, then a gentle time-of-day cue.
  * Guests / not-onboarded / empty taste -> calm static defaults.
  */
-export function deriveMoodPrompts(taste: TasteSummary | null | undefined, now = new Date()): string[] {
+export function deriveMoodPrompts(taste: MoodTasteInput | null | undefined, now = new Date()): string[] {
   if (!taste || !taste.onboarded) {
     return [...GUEST_MOOD_PROMPTS];
   }
