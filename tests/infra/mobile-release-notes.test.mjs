@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import test from 'node:test';
 
 import { changelogFor, markdownFor, releaseHistoryFor, rollbackBuildPlan } from '../../scripts/mobile-release-notes.mjs';
@@ -82,4 +83,22 @@ test('patches exactly one Android versionCode for a historical rollback build', 
   const gradle = 'defaultConfig {\n        versionCode 1064003\n        versionName \"1.64.3\"\n    }\n';
   assert.equal(patchMobileVersionCode(gradle, 1065000), 'defaultConfig {\n        versionCode 1065000\n        versionName \"1.64.3\"\n    }\n');
   assert.throws(() => patchMobileVersionCode('versionCode 1\nversionCode 2\n', 1065000), /Expected one active versionCode/);
+});
+
+test('every retained older release names its source commit and signed rollback APK', () => {
+  const history = JSON.parse(readFileSync(new URL('../../apps/mobile/update-history.json', import.meta.url), 'utf8'));
+  for (const older of history.entries.slice(1)) {
+    assert.match(older.sourceCommit ?? '', /^[0-9a-f]{40}$/, `${older.version} needs its source commit`);
+    assert.equal(older.rollbackAsset, `LuvLyrics-rollback-${older.version}.apk`, `${older.version} needs its rollback asset`);
+  }
+});
+
+test('the publish step publishes apk-latest again after its last upload, so GitHub moves the date the update check reads', () => {
+  const workflow = readFileSync(new URL('../../.github/workflows/mobile-apk.yml', import.meta.url), 'utf8');
+  const lastUpload = workflow.indexOf('notes/update-history.json" --clobber');
+  const unpublish = workflow.indexOf('gh release edit apk-latest --draft=true');
+  const republish = workflow.indexOf('gh release edit apk-latest --draft=false');
+  assert.ok(lastUpload > 0, 'the publish step uploads update-history.json');
+  assert.ok(unpublish > lastUpload, 'the draft toggle comes after the last upload');
+  assert.ok(republish > unpublish, 'the release is published again after it is drafted');
 });
