@@ -169,6 +169,14 @@ gained the `sourceCommit` (`c2ca5e7a`, the commit apk-latest was built from) and
 APK` caught the missing fields and now passes. CI will build the 1.69.1
 rollback APK when 1.69.2 releases.
 
+### 1.mobile-unused-imports (follow-up)
+
+Removed 11 unused imports and locals that `tsc --noUnusedLocals` reported in
+the mobile app, in files this pass touched or imported: `StreamScreen`
+(imports, `account`, `resetHomePagination` and eleven unused styles),
+`StreamItems`, `useNowPlayingLogic`, `PlaylistDetailScreen`, `SearchScreen` and
+one test. Each is a name nothing reads. Verified by `mobile:check`.
+
 ## Held findings
 
 Each needs the evidence or decision listed. Independent cleanup continued
