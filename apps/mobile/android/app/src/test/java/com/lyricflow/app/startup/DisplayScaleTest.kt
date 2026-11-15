@@ -28,4 +28,26 @@ class DisplayScaleTest {
         assertEquals(320, DisplayScale.scaledDpi(320, 1f))
         assertEquals(1, DisplayScale.scaledDpi(0, 0.85f))
     }
+    @Test
+    fun fractionalDeviceDensitiesUseTheSameRoundedDpiForLayoutAndDrawing() {
+        // Refreshed view contexts derive their scale from configuration DPI; native mounts use metrics density.
+        // A 420dpi phone on Small rounds to 386dpi; using the unrounded float produces a different coordinate space.
+        assertEquals(386, DisplayScale.scaledDpi(420, 0.92f))
+        assertEquals(386f / 160f, DisplayScale.scaledDensity(2.625f, 0.92f), 0.00001f)
+        for (dpi in listOf(240, 280, 320, 420, 440, 480)) {
+            for (scale in DisplayScale.CHOICES) {
+                val layoutDensity = DisplayScale.scaledDpi(dpi, scale) / 160f
+                val drawingDensity = DisplayScale.scaledDensity(dpi / 160f, scale)
+                assertEquals(720f, (720f / layoutDensity) * drawingDensity, 0.001f)
+                assertEquals(1600f, (1600f / layoutDensity) * drawingDensity, 0.001f)
+            }
+        }
+    }
+    @Test
+    fun freshInstallDefaultKeepsTheDeviceDensity() {
+        for (dpi in listOf(240, 280, 320, 420, 440, 480)) {
+            assertEquals(dpi, DisplayScale.scaledDpi(dpi, DisplayScale.DEFAULT))
+            assertEquals(dpi / 160f, DisplayScale.scaledDensity(dpi / 160f, DisplayScale.DEFAULT), 0.00001f)
+        }
+    }
 }

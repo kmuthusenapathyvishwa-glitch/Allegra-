@@ -43,14 +43,15 @@ class MainActivity : ReactActivity() {
 
   override fun onConfigurationChanged(newConfig: Configuration) {
     // The system recomputed the density for the change; put the chosen size back before React reads it.
-    applyDisplayScale()
-    super.onConfigurationChanged(newConfig)
+    val config = DisplayScale.configuration(this, newConfig)
+    applyDisplayScale(config)
+    super.onConfigurationChanged(config)
   }
 
-  private fun applyDisplayScale() {
+  private fun applyDisplayScale(config: Configuration = resources.configuration) {
     runCatching {
-      DisplayScale.apply(this, resources)
-      DisplayScale.apply(this, applicationContext.resources)
+      DisplayScale.apply(this, resources, config)
+      DisplayScale.apply(this, applicationContext.resources, config)
       DisplayMetricsHolder.initDisplayMetrics(applicationContext)
     }
   }
