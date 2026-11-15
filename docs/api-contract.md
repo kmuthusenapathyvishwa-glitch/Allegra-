@@ -284,7 +284,7 @@ below; when they have nothing and the ref is a Saavn song, **JioSaavn's own plai
 Owner clarification (2026-10-17): keep raw site words readable here as the plain fallback while
 listener alignment is being built. After the ~3 s provider grace period, JioSaavn plain words
 lead, followed by site text labelled "Found online (English)" / "Found online (Tamil)".
-Site names and URLs never reach the listener. Unsynced site text is excluded from Other lyrics.
+Site names and URLs never reach the listener. Other lyrics explicitly requests matching site variants as plain text, within the request budget.
 
 Sources: LRCLIB first, then Better Lyrics, LyricsPlus, Unison, Lyrica and KuGou asked together (each
 optional, synced preferred, in that order on a tie). **Answers within ~11 s**: a lookup still running
@@ -302,7 +302,7 @@ standard envelope, return `Cache-Control: no-store`, and have independent rate-l
   source, url: null, script: 'latin' | 'native', language, lines: string[], synced: boolean }`.
   Providers precede sites; already timed versions are marked `synced`. Site labels are
   "Found online"; actual names and URLs stay server-side. Raw site text is also readable as
-  the plain Now Playing fallback, but excluded from alternatives. Candidates are cached for 24 hours.
+  the plain Now Playing fallback, and in explicitly requested alternatives (except `syncedOnly` lookups). Candidates are cached for 24 hours.
   IDs are content hashes bound to the recording and source; a cold instance re-fetches the
   canonical candidate and verifies its hash before accepting a submission.
 - `POST /api/lyrics/sync` accepts exactly `{ ref, versions: [{ candidateId, script,
@@ -336,8 +336,9 @@ Runs only when the listener opens **Other lyrics**. Returns up to six usable, de
 
 With `ref`, the list **starts with every listener-synced version** (English, then the song's own
 script) and then JioSaavn's plain lyrics for a Saavn song, ahead of the providers' six. Those leading
-items are never cached with the list, so a new sync shows up within a minute. Raw site words
-are reserved for the sync finder and do not appear in this list.
+items are never cached with the list, so a new sync shows up within a minute. Matching site variants follow as plain text labelled "Found online (English)" / "Found online (Tamil)".
+Site names and URLs remain private. Site lookup preserves album/language hints, skips unsupported
+languages and `syncedOnly` requests, and shares the request budget; failures leave other versions usable.
 
 ### `GET /api/lyrics/verified` — additive
 `ref`? or `title` + `artist`, `duration`? (one of `ref` / `title` required, else `400`)
@@ -418,6 +419,18 @@ Translated lines carry no `words` (the timing belongs to the original wording).
 MyMemory is the free keyless primary. A configured, self-hosted LibreTranslate instance is the
 fallback; unmanaged public mirrors are never assumed. The legacy `/api/ai/translate-lyrics` path is
 an alias for compatibility. `502` means both available providers failed.
+
+Additive, 1.69.0 (bring your own key):
+`mode? = "translate" | "romanize" | "transcribe"` and
+`ai? = { provider: "openai" | "openrouter" | "gemini", apiKey: string (8–512), model: string (1–160) }`.
+With `ai`, the API forwards the listener's own key to that provider's OpenAI-compatible chat endpoint for this
+request only; the key is never stored, logged, cached or echoed. Every reply must hold exactly one line per input
+line (one corrective retry, then the whole song fails), and `provider` is `"<provider>:<model>"`. Results are
+cached across listeners by provider, model, mode, languages and lyrics, never by key. `romanize` (Latin letters)
+and `transcribe` (the target language's script) need `ai`: without it the answer is `400` "Romanised and
+pronunciation lyrics need your AI key." A refused key is `400` "That AI key was refused."; a provider rate
+limit is `429` "Your AI provider is limiting this key. Try again in a minute." A malformed `mode` or `ai` is `400`.
+The body limit for this route is 256 kB.
 
 ### `GET /api/recommendations`
 `songId`? (current song, added to taste context if present) · requires `Authorization: Bearer <token>`

@@ -4,8 +4,7 @@ import { Modal, ScrollView, StyleSheet, View, useWindowDimensions } from 'react-
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useReducedMotion } from 'react-native-reanimated';
 
-import { BlurIntensity, Glass, Radius, Signal, Space } from '../../constants/allegraTheme';
-import { Frosted } from '../allegra/Frosted';
+import { Glass, Radius, Signal, Space, Surface } from '../../constants/allegraTheme';
 import { Tactile } from '../allegra/motion';
 import UpdatePanel from './UpdatePanel';
 
@@ -36,8 +35,9 @@ export function StreamUpdatesDropdown({ topOffset, rightOffset }: Props): React.
         pressScale={0.96}
         style={styles.trigger}
       >
+        {/* Owner, 1.69.0: the black-and-white LuvLyrics mark, a full disc the size of the Devices button beside it. */}
         <Image
-          source={require('../../../assets/luvlyrics_logo_med.png')}
+          source={require('../../../assets/luvlyrics-icon-monochrome.png')}
           contentFit="cover"
           transition={0}
           style={styles.logo}
@@ -63,7 +63,6 @@ export function StreamUpdatesDropdown({ topOffset, rightOffset }: Props): React.
             <View />
           </Tactile>
           <View style={[styles.dropdown, { top: topOffset, right: rightOffset, width: panelWidth, maxHeight: panelMaxHeight }]}>
-            <Frosted radius={Radius.sheet} intensity={BlurIntensity.panel} tint={0.28} />
             <ScrollView
               style={styles.scroll}
               contentContainerStyle={styles.content}
@@ -87,19 +86,21 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: Glass.fillLight,
+    overflow: 'hidden',
+    backgroundColor: Signal.bg,
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: Glass.hairline,
   },
-  logo: { width: 30, height: 30, borderRadius: 8 },
-  backdrop: { backgroundColor: Glass.fillLight },
+  // The mark's own black fills the circle; the heart sits in the middle at the Devices glyph's visual weight.
+  logo: { width: 40, height: 40 },
+  backdrop: { backgroundColor: Glass.scrim },
   dropdown: {
     position: 'absolute',
     overflow: 'hidden',
     borderRadius: Radius.sheet,
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: Glass.hairlineStrong,
-    backgroundColor: Glass.fill,
+    backgroundColor: Surface.deep,
     shadowColor: Signal.bg,
     shadowOffset: { width: 0, height: 10 },
     shadowOpacity: 0.24,
