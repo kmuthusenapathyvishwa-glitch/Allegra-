@@ -2,13 +2,14 @@
   "entries": [
     {
       "version": "1.69.0",
-      "description": "Songs replay without using data, the player follows your finger, and new versions show up in About again",
+      "description": "The player follows your finger, replayed songs use less data, and Stream has a clearer header",
       "changelog": [
         {
           "title": "New",
           "items": [
-            "Songs you stream are kept on your phone, so playing them again uses no data. Choose how much space in Settings, Playback",
-            "If your connection drops in the middle of a song, it carries on from the same moment instead of skipping ahead"
+            "Songs you stream are kept temporarily on your phone, so replaying them can use less data. Choose the space limit in Settings, Playback",
+            "The app tries to resume songs interrupted by a dropped connection",
+            "Use your own AI key on the website to translate lyrics or read their pronunciation"
           ]
         },
         {
