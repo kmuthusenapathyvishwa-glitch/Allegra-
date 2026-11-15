@@ -370,4 +370,12 @@ jobs:
           # each phone's build time, so a release that stays in place looks older than every newer build.
           # Publishing it again moves the date to now. Assets stay in place; this runs after every upload.
           gh release edit apk-latest --draft=true
-          gh release edit apk-latest --draft=false --prerelease
+          # A release left as a draft is hidden from every listener, so retry the publish rather than stop here.
+          for attempt in 1 2 3; do
+            if gh release edit apk-latest --draft=false --prerelease; then break; fi
+            if [ "$attempt" -eq 3 ]; then
+              echo "::error::apk-latest could not be published again, so it is still a draft." >&2
+              exit 1
+            fi
+            sleep 5
+          done
