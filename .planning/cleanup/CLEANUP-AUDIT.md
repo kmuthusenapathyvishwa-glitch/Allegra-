@@ -32,7 +32,7 @@ that needs data, logs or an owner decision.
 
 | Category | Removed or simplified | Held (verify or decide) | Kept |
 | --- | --- | --- | --- |
-| 1 Dead code | 11 exports, 7 unused locals, 2 generated copies | Convex relations, 4 routes, 4 mobile dependencies, 3 backfills, `playStats`, `clearAccountCheckpoints` | `trackVersion`, `QueueStager` generic |
+| 1 Dead code | 11 exports, 7 unused locals, 2 generated copies | Convex relations, 4 routes, 3 backfills, `playStats` | `trackVersion`, `QueueStager` generic |
 | 2 Duplicate logic | `moodPrompts` (API copy replaced by a generated copy) | `leadArtist` (nine copies), API/shared `types.ts` drift | generated API copies |
 | 3 Unused UI | `CustomAlert.tsx` | `AddListSheet.tsx` with `songList` | web components (no unused file) |
 | 4 Complexity | None proven | None | `luvLink/legacy`, connect ports, `sha256.ts` |
@@ -178,16 +178,32 @@ around them.
 | --- | --- | --- | --- |
 | 1.convex-relations | `convex/relations.ts`, `songRelations` table, `relatedSong` | VERIFY/DECIDE | Owner says the Echo port will not use it, and the dashboard shows the table is empty |
 | 1.routes | `POST /auth/guest` (alias of `/auth/anon`), `/ai/translate-lyrics`, `/lyrics/report`, `/lyrics/search` | VERIFY | `vercel logs` for these paths over the oldest supported release window |
-| 1.mobile-deps | `react-native-webview`, `expo-linking`, `expo-system-ui`, `expo-dev-client` | VERIFY | One removal per commit, CI build, install and launch check (native autolinking) |
 | 1.backfills | `backfillLastActive`, `backfillClosedReports`, `trimRecentlyPlayed` | VERIFY | Dashboard shows no profile lacks `lastActive`, closed reports are trimmed, recent plays are trimmed |
 | 1.play-stats | `playStats` field in `convex/profiles.ts` and `schema.ts` | VERIFY | Data check, then a migration |
-| 1.clear-account-checkpoints | `clearAccountCheckpoints` in `importProgressStore.ts` | DECIDE | It looks meant for sign-out (Spotify import data stays local). Decide whether to call it on sign-out or delete it |
-| 3.add-list-sheet | `AddListSheet.tsx`, `services/stream/songList.ts` and test | DECIDE | The 1.60.0 commit `bf78a9a9` removed its only importer without saying so, and `apps/mobile/CLAUDE.md:273` still calls it live. Retired on purpose means delete it plus the doc line. Disconnected by accident means restore the list button in Stream search |
+| 3.add-list-sheet | `AddListSheet.tsx`, `services/stream/songList.ts` and test | KEEP (owner) | Owner chose to keep both for now. The 1.60.0 commit `bf78a9a9` removed its only importer without saying so, and `apps/mobile/CLAUDE.md:273` still calls it live. Revisit: delete it with the doc line, or restore the list button in Stream search |
 | 2.lead-artist | Nine `leadArtist` copies with different separators | VERIFY | Characterisation tests per copy, then matcher cache-key bumps for any copy whose output changes |
 | 2.types-seam | `apps/api/src/types.ts` against `packages/shared/types.ts` | VERIFY | Owner decision; a test that fails on shape drift |
 | 5.docs | `apps/mobile/README_DETAILED.md`, `RECONCILIATION.md`, root `HANDOFF.md`, `apps/mobile/docs/github-drafts/*` | VERIFY | Read for open items, move live content into `docs/`, fix the README link |
-| 5.archive-dj | `apps/mobile/archive/dj/` | DECIDE | Owner archived it on 2026-11-12; keep or delete |
 | 8.rules | Web `any` (2), mobile `any` (48), `console.log` in `convex/` (3) and mobile (73) | VERIFY | Whether mobile is held to hard rules 8 and 10 |
+
+## Decided
+
+- `clearAccountCheckpoints`: wired in. The web import keeps a signed-in
+  listener's Spotify matches and checkpoint in IndexedDB for seven days. On a
+  shared computer the next person could find them after sign-out, so
+  `useForgetImportOnSignOut` (called from `App.tsx`) clears them through the
+  existing `onBeforeSignOut` hook. The mobile app has no such store.
+- `apps/mobile/archive/dj/`: kept. It was archived on purpose on 2026-11-12
+  (`c64ddb1a`), has its own README, and `tsconfig.json` already excludes it.
+  The web and API still ship the DJ, so the code may return.
+- Mobile dependencies: all four kept, each in use.
+  - `react-native-webview` is the peer dependency of `react-native-youtube-iframe`,
+    which `YtMiniPlayer.tsx` renders.
+  - `expo-system-ui` is what makes `userInterfaceStyle: "dark"` in `app.json`
+    apply on Android.
+  - `expo-dev-client` backs the `developmentClient` build profile in `eas.json`.
+  - `expo-linking` has no import, but it ships an Android module, so removing
+    it changes the native build for no user benefit.
 
 ## Kept after inspection
 
@@ -223,8 +239,8 @@ around them.
 ## Remaining steps
 
 1. Rotate the Genius token (owner, now).
-2. Decide the three DECIDE rows (`AddListSheet`, `clearAccountCheckpoints`,
-   `archive/dj`). Small each.
+2. Decided: see the Decided section. `AddListSheet` stays until the owner
+   revisits it.
 3. Run the log and dashboard checks for the VERIFY rows, then remove the
    routes, backfills and relations in one Convex/API pass. Medium, because it
    needs production reads and a contract-doc update.
