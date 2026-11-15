@@ -366,3 +366,8 @@ jobs:
           gh release view apk-latest --json assets --jq '[.assets[].name]' > "$RUNNER_TEMP/release-assets.json"
           node scripts/mobile-release-notes.mjs --to "$GITHUB_SHA" --version "$VERSION" --history apps/mobile/update-history.json --available-rollbacks "$RUNNER_TEMP/release-assets.json" --out "$RUNNER_TEMP/notes"
           gh release upload apk-latest "$RUNNER_TEMP/notes/update-history.json" --clobber
+          # GitHub keeps a release's first publish date. The in-app update check compares that date with
+          # each phone's build time, so a release that stays in place looks older than every newer build.
+          # Publishing it again moves the date to now. Assets stay in place; this runs after every upload.
+          gh release edit apk-latest --draft=true
+          gh release edit apk-latest --draft=false --prerelease
