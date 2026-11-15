@@ -2778,7 +2778,7 @@ button.top-song-album:hover { color: var(--ink); text-decoration: underline; tex
     gap: 2px;
   }
   .am-transport .am-btn:not(.am-btn--skip),
-  .am-transport .am-btn--skip:first-of-type,
+  .am-transport .am-btn--skip:has(+ .am-play),
   .am-volume,
   .am-btn--mute { display: none; }
   .am-btn--lyrics,
@@ -3661,7 +3661,7 @@ button.top-song-album:hover { color: var(--ink); text-decoration: underline; tex
 @media (max-width: 640px) {
   .album-page { padding: var(--space-sm) var(--space-xs) calc(var(--mini-player-height) + var(--nav-height) + var(--space-xl)); }
   .album-hero { grid-template-columns: minmax(0, 1fr); gap: var(--space-md); padding: var(--space-md); }
-  .album-hero__art { width: min(62vw, 200px); max-width: 200px; }
+  .album-hero__art { width: min(62vw, 200px, 24dvh); max-width: 200px; }
   .album-hero__copy h1 { font-size: var(--text-title); }
   .album-toolbar { gap: var(--space-2xs); padding-inline: var(--space-2xs); }
   .album-toolbar__shuffle { width: 44px; min-width: 44px; padding-inline: 0; justify-content: center; }
@@ -5995,6 +5995,12 @@ button.session-chip:hover { background: rgba(255, 255, 255, 0.11); }
     font-size: 11px;
   }
 }
+@media (max-width: 480px) {
+  /* Full-player tools stay in the expanded player; the bar keeps room for the song. */
+  .mini-player { grid-template-columns: minmax(0, 1fr) auto; }
+  .mini-player .am-right { display: none; }
+}
+
 /* Allegra profile sheet */
 .profile-sheet {
   display: flex;
