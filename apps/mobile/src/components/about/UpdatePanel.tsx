@@ -8,7 +8,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, AppState, Linking, StyleSheet, Text, View } from 'react-native';
-import Animated, { useAnimatedStyle, useReducedMotion, useSharedValue, withTiming } from 'react-native-reanimated';
+import Animated, { FadeIn, useAnimatedStyle, useReducedMotion, useSharedValue, withTiming } from 'react-native-reanimated';
 import appConfig from '../../../app.json';
 import { Glass, Motion, Radius, Signal, Space, Surface, TypeScale } from '../../constants/allegraTheme';
 import {
@@ -66,33 +66,63 @@ const Notes: React.FC<{ notes: ReleaseNotes }> = ({ notes }) => (
   </View>
 );
 
-/** All recent versions stay readable in the dropdown, with the newest one first. */
-const RecentVersions: React.FC<{ entries: readonly ReleaseHistoryEntry[]; onRollback?: (entry: ReleaseHistoryEntry) => void }> = ({ entries, onRollback }) => (
-  <View>
-    <Text style={styles.recentHeading}>Recent updates</Text>
-    {entries.map((entry, index) => (
-      <View key={entry.version} style={[styles.historyEntry, index > 0 && styles.historyEntryGap]}>
-        <View style={styles.historyHeader}>
-          <Text style={styles.historyVersion}>Version {entry.version}</Text>
-          {index === 0 ? <Text style={styles.latestBadge}>Latest</Text> : null}
-        </View>
-        <Notes notes={entry.notes} />
-        {entry.rollbackUrl && onRollback ? (
-          <Tactile
-            onPress={() => onRollback(entry)}
-            accessibilityRole="button"
-            accessibilityLabel={'Roll back to version ' + entry.version}
-            style={styles.rollbackButton}
-            pressScale={0.97}
-          >
-            <Ionicons name="arrow-undo" size={15} color={Signal.wave} />
-            <Text style={styles.rollbackText}>Roll back to {entry.version}</Text>
-          </Tactile>
-        ) : null}
-      </View>
-    ))}
-  </View>
-);
+/** The chevron turns over as the list opens: a quarter-second on the standard curve, none under Reduce Motion. */
+const Chevron: React.FC<{ open: boolean }> = ({ open }) => {
+  const reduce = useReducedMotion();
+  const turn = useSharedValue(open ? 1 : 0);
+  useEffect(() => {
+    turn.value = withTiming(open ? 1 : 0, { duration: reduce ? 0 : Motion.duration.base, easing: Motion.ease.standard });
+  }, [open, reduce, turn]);
+  const style = useAnimatedStyle(() => ({ transform: [{ rotate: `${turn.value * 180}deg` }] }));
+  return <Animated.View style={style}><Ionicons name="chevron-down" size={20} color={Signal.inkSoft} /></Animated.View>;
+};
+
+/** Recent versions, newest first, folded under one heading: a tap on the arrow opens them. */
+const RecentVersions: React.FC<{ entries: readonly ReleaseHistoryEntry[]; onRollback?: (entry: ReleaseHistoryEntry) => void }> = ({ entries, onRollback }) => {
+  const [open, setOpen] = useState(false);
+  const reduce = useReducedMotion();
+  return (
+    <View>
+      <Tactile
+        onPress={() => { Haptics.selectionAsync().catch(() => {}); setOpen(value => !value); }}
+        accessibilityRole="button"
+        accessibilityLabel="Recent updates"
+        accessibilityState={{ expanded: open }}
+        pressScale={0.98}
+        style={styles.recentToggle}
+      >
+        <Text style={styles.recentHeading}>Recent updates</Text>
+        <Chevron open={open} />
+      </Tactile>
+      {open ? (
+        // No exiting animation: the dropdown around this animates its own layout, and the two together crashed Reanimated 4.1.
+        <Animated.View entering={reduce ? undefined : FadeIn.duration(Motion.duration.base)}>
+          {entries.map((entry, index) => (
+            <View key={entry.version} style={[styles.historyEntry, index > 0 && styles.historyEntryGap]}>
+              <View style={styles.historyHeader}>
+                <Text style={styles.historyVersion}>Version {entry.version}</Text>
+                {index === 0 ? <Text style={styles.latestBadge}>Latest</Text> : null}
+              </View>
+              <Notes notes={entry.notes} />
+              {entry.rollbackUrl && onRollback ? (
+                <Tactile
+                  onPress={() => onRollback(entry)}
+                  accessibilityRole="button"
+                  accessibilityLabel={'Roll back to version ' + entry.version}
+                  style={styles.rollbackButton}
+                  pressScale={0.97}
+                >
+                  <Ionicons name="arrow-undo" size={15} color={Signal.wave} />
+                  <Text style={styles.rollbackText}>Roll back to {entry.version}</Text>
+                </Tactile>
+              ) : null}
+            </View>
+          ))}
+        </Animated.View>
+      ) : null}
+    </View>
+  );
+};
 
 /** WorkManager owns the transfer. This view observes only while visible and active. */
 export default function UpdatePanel({ visible, dropdown = false, onClose }: { visible: boolean; dropdown?: boolean; onClose?: () => void }) {
@@ -299,13 +329,11 @@ export default function UpdatePanel({ visible, dropdown = false, onClose }: { vi
       </View>
     </View>
 
-    {dropdown
-      ? versionsToShow ? <RecentVersions entries={versionsToShow} onRollback={supportsAppUpdates ? requestRollback : undefined} /> : null
-      : latestNotes ? <Notes notes={latestNotes} /> : null}
     {downloading ? <ProgressBar percent={status.progress} /> : null}
 
     {notice || status.kind === 'error' ? <Text style={styles.notice} accessibilityLiveRegion="polite">{notice || status.message}</Text> : null}
 
+    {/* The action sits right under the status, so Update and Install never wait below a long list of notes. */}
     {action ? (
       <Tactile
         onPress={() => { Haptics.selectionAsync().catch(() => {}); action.run(); }}
@@ -317,6 +345,10 @@ export default function UpdatePanel({ visible, dropdown = false, onClose }: { vi
         <Text style={styles.buttonText}>{checking ? 'Checking' : action.label}</Text>
       </Tactile>
     ) : !supportsAppUpdates ? <Text style={styles.body}>Installable updates are available in the Android app.</Text> : null}
+
+    {dropdown
+      ? versionsToShow ? <RecentVersions entries={versionsToShow} onRollback={supportsAppUpdates ? requestRollback : undefined} /> : null
+      : latestNotes ? <Notes notes={latestNotes} /> : null}
 
     {!dropdown ? <>
       <View style={styles.settings}>
@@ -353,7 +385,9 @@ const styles = StyleSheet.create({
   versionLine: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 },
   versionLabel: { color: Signal.inkMuted, fontSize: TypeScale.meta },
   versionValue: { color: Signal.ink, fontSize: TypeScale.body, fontWeight: '600' },
-  recentHeading: { color: Signal.ink, fontSize: TypeScale.body, fontWeight: '700', marginTop: Space.md, marginBottom: Space.sm },
+  // The whole row is the target (56dp): heading on the left, the arrow on the right.
+  recentToggle: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', minHeight: 56, marginTop: Space.md },
+  recentHeading: { color: Signal.ink, fontSize: TypeScale.body, fontWeight: '700' },
   historyEntry: { padding: Space.sm, borderRadius: Radius.sheet, backgroundColor: Glass.fillLight, borderWidth: StyleSheet.hairlineWidth, borderColor: Glass.hairline },
   historyEntryGap: { marginTop: Space.sm },
   historyHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: Space.sm, marginBottom: Space.xxs },

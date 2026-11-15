@@ -184,7 +184,6 @@
     "screens/PlaylistDetailScreen.tsx": 1,
     "ui/Chip.tsx": 1,
     "ui/HeaderGlow.tsx": 1,
-    "ui/Segmented.tsx": 1,
     "ui/Sheet.tsx": 1,
     "ui/SongRow.tsx": 1
   },

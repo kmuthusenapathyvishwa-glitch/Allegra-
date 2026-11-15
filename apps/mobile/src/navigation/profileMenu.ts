@@ -1,10 +1,11 @@
 /**
  * The profile menu (1.42.0): what the You tab held, opened from your picture at the top left of Stream, Search and
  * Library, as Spotify's profile menu is. Pure data and labels, so the order and the names are tested.
+ * Blends and LuvLink live in the Create sheet and Connect devices in the Stream header, so they are not repeated here.
  */
 import type { IconName } from '../ui';
 
-export type ProfileAction = 'about' | 'stats' | 'downloads' | 'import' | 'devices' | 'blends' | 'luvlink' | 'settings';
+export type ProfileAction = 'about' | 'stats' | 'downloads' | 'import' | 'settings';
 
 export interface ProfileItem {
   id: ProfileAction;
@@ -24,11 +25,6 @@ export const PROFILE_GROUPS: readonly ProfileGroup[] = [
     { id: 'stats', title: 'Listening stats', subtitle: 'Your top songs, artists and habits', icon: 'stats-chart-outline' },
     { id: 'downloads', title: 'Downloads', subtitle: 'Songs saved on this phone for offline', icon: 'download-outline' },
     { id: 'import', title: 'Import from Spotify', subtitle: 'Bring your playlists and likes here', icon: 'cloud-download-outline' },
-  ] },
-  { label: 'Together', items: [
-    { id: 'blends', title: 'Blends', subtitle: 'Mix your taste with a friend', icon: 'git-merge-outline' },
-    { id: 'luvlink', title: 'LuvLink', subtitle: 'Listen with friends in sync', icon: 'people-outline' },
-    { id: 'devices', title: 'Connect devices', subtitle: 'See and control what plays on your other devices', icon: 'desktop-outline' },
   ] },
   { label: 'App', items: [
     { id: 'settings', title: 'Settings and privacy', subtitle: 'Playback, lyrics, look, privacy and what is saved', icon: 'settings-outline' },
