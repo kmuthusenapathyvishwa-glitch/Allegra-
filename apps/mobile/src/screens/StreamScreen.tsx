@@ -1,5 +1,4 @@
 import { AppScreen } from '../components/AppScreen';
-import { TypeScale } from '../constants/allegraTheme';
 /**
  * Stream: pinned title/device/update controls above a scrolling, typed home feed.
  * The current cover supplies the static glow. Songs retain the existing streaming,
@@ -11,20 +10,16 @@ import { FlashList, type FlashListRef } from '@shopify/flash-list';
 import { LinearGradient } from 'expo-linear-gradient';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  ActivityIndicator,
   useWindowDimensions,
-  Keyboard,
   RefreshControl,
   ScrollView,
   StyleSheet,
-  Text,
   View,
   type NativeScrollEvent,
   type NativeSyntheticEvent
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Toast } from '../components/Toast';
-import { AuraMood } from '../components/allegra/MusicFlowField';
 import { PrimaryButton, SectionHeading } from '../components/allegra/home';
 import { RiseIn } from '../components/allegra/motion';
 import { ProfileButton } from '../components/nav/ProfileButton';
@@ -33,17 +28,16 @@ import { useHeaderGlow } from '../hooks/useHeaderGlow';
 import { BrowseShelf } from '../components/browse/BrowseShelf';
 import { StreamUpdatesDropdown } from '../components/about/StreamUpdatesDropdown';
 import { ConnectDropdown } from '../components/connect/ConnectDropdown';
-import { GUTTER, MoodChips, QuickPicks, ShortcutGrid, SongRow, TrackItem } from '../components/stream/StreamHome';
+import { GUTTER, MoodChips, QuickPicks, TrackItem } from '../components/stream/StreamHome';
 import { RecentShelf, RecentSwitch } from '../components/stream/RecentShelf';
 import { ShimmerBlock } from '../components/stream/StreamItems';
 import { recentPlaylists, type RecentView } from '../services/stream/recentItems';
 import { usePlaylistStore } from '../store/playlistStore';
 import { useStreamSongActions } from '../components/stream/useStreamSongActions';
-import { Glass, Radius, Signal, Space, Surface } from '../constants/allegraTheme';
+import { Radius, Signal, Space, Surface } from '../constants/allegraTheme';
 import { useBottomClearance } from '../hooks/useBottomClearance';
 import { isDoubleTap } from '../navigation/tabs';
 import { useLiveQuickPicks } from '../hooks/useLiveQuickPicks';
-import { useAccount } from '../services/account/AccountProvider';
 import { tasteSeeds } from '../services/luvsTaste';
 import { StreamService } from '../services/stream/StreamService';
 import { playYTSongs, resolveYTSong } from '../services/stream/browsePlay';
@@ -57,7 +51,7 @@ import { searchOfficial } from '../services/stream/officialSearch';
 import { recommendFor } from '../services/stream/recommend';
 import { streamIdFor } from '../services/stream/streamSong';
 import { YTMusicClient } from '../services/ytmusic/YTMusicClient';
-import { HomeChip, HomePage, leadArtist, Shelf, YTItem, YTPageItem } from '../services/ytmusic/browse';
+import { HomePage, leadArtist, Shelf, YTItem } from '../services/ytmusic/browse';
 import { YTSong } from '../services/ytmusic/parsers';
 import { useDownloadQueueStore } from '../store/downloadQueueStore';
 import { useFollowedArtistsStore } from '../store/followedArtistsStore';
@@ -67,7 +61,7 @@ import { useSongsStore } from '../store/songsStore';
 import { useStreamHistoryStore } from '../store/streamHistoryStore';
 import { TabParamList, type MixParams } from '../types/navigation';
 import { UnifiedSong } from '../types/song';
-import { Button, CollectionCard, HeaderGlow, IconButton, identityMeta, Sheet, SheetDivider, SheetIdentity, SheetOption, Text as UiText } from '../ui';
+import { Button, CollectionCard, HeaderGlow, identityMeta, Sheet, SheetDivider, SheetIdentity, SheetOption, Text as UiText } from '../ui';
 import { countOf } from '../utils/formatters';
 import * as Haptics from '../utils/haptics';
 import { shuffled } from '../utils/shuffle';
@@ -96,7 +90,6 @@ const StreamScreen: React.FC = () => {
   const languages = useLuvsPreferencesStore(s => s.preferredLanguages);
   const currentSongId = usePlayerStore(s => s.currentSongId);
   const addToDownloads = useDownloadQueueStore(s => s.addToQueue);
-  const account = useAccount();
   const isFocused = useIsFocused();
 
   // The page kept from last time, already read during launch: the first frame shows it, not placeholders.
@@ -118,11 +111,6 @@ const StreamScreen: React.FC = () => {
   const homeGeneration = useRef(0);
   const continuationGeneration = useRef(0);
   const homeMoreRequest = useRef<string | null>(null);
-  const resetHomePagination = useCallback(() => {
-    didUserScroll.current = false;
-    distanceFromEnd.current = Number.POSITIVE_INFINITY;
-    viewportHeight.current = 0;
-  }, []);
   const lastTabPress = useRef(0);
   // A tap on the Stream tab is "take me home": any search or mood view clears and the page goes to the top.
   const backHome = useRef<() => void>(() => {});
@@ -539,27 +527,8 @@ const styles = StyleSheet.create({
   headerActions: { flexDirection: 'row', alignItems: 'center', gap: Space.xs },
   // The picture sits in its 48dp target at the gutter's edge, so the title keeps Spotify's spacing from it.
   headerLead: { flexDirection: 'row', alignItems: 'center', gap: Space.xs, marginLeft: -Space.sm, flexShrink: 1 },
-  search: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Space.xs,
-    marginHorizontal: GUTTER,
-    marginTop: Space.xs,
-    height: 44,
-    paddingHorizontal: Space.sm,
-    borderRadius: 10,
-    backgroundColor: Glass.chip,
-  },
-  searchInput: { flex: 1, color: Signal.ink, fontSize: TypeScale.body, paddingVertical: 0 },
-  listButton: { width: 30, height: 30, borderRadius: 15, alignItems: 'center', justifyContent: 'center' },
-  saveAllRow: { paddingHorizontal: GUTTER, marginTop: 4, marginBottom: 2, alignItems: 'flex-start' },
   chips: { marginTop: Space.sm },
-  firstSection: { marginTop: Space.md },
-  list: { paddingHorizontal: GUTTER },
-  spinner: { marginTop: Space.lg },
   skeleton: { paddingHorizontal: GUTTER, gap: Space.sm, marginTop: Space.lg },
-  skeletonGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', rowGap: Space.xs, marginBottom: Space.md },
-  empty: { color: Signal.inkMuted, fontSize: TypeScale.body, textAlign: 'center', marginTop: Space.lg, paddingHorizontal: Space.xl },
   emptyCard: {
     marginHorizontal: GUTTER,
     marginTop: Space.xl,
@@ -569,8 +538,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: Space.sm,
   },
-  emptyTitle: { fontWeight: '700', fontSize: TypeScale.section, color: Signal.ink },
-  emptyBody: { fontSize: TypeScale.body, color: Signal.inkMuted, textAlign: 'center' },
   statusScrim: { position: 'absolute', top: 0, left: 0, right: 0 },
 });
 
