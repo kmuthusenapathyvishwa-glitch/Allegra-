@@ -1,7 +1,8 @@
 /**
  * The profile menu (1.42.0): Spotify's side menu, opened from your picture at the top left of Stream, Search and
- * Library. It holds what the You tab did: About and updates first, then Downloads, Import, Blends, LuvLink,
- * Connect devices and Settings (`navigation/profileMenu`).
+ * Library. It holds what the You tab did: About and updates first, then stats, Downloads, Import and
+ * Settings (`navigation/profileMenu`). Blends, LuvLink and Connect devices are not repeated: Create and the Stream
+ * header have them.
  *
  * A panel slides in from the left over a dimmed app (transform and opacity only; a fade under Reduce Motion). Back,
  * a tap outside or picking a row closes it. About and Downloads open as their own sheets once it has closed.
@@ -13,7 +14,8 @@ import { Gesture, GestureDetector, GestureHandlerRootView } from 'react-native-g
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { Glass, ListRow, Motion, Signal, Space, Surface, Tactile, Text } from '../../ui';
-import { ShellFrost } from '../../constants/allegraTheme';
+import { Radius, ShellFrost } from '../../constants/allegraTheme';
+import appConfig from '../../../app.json';
 import { useAccount } from '../../services/account/AccountProvider';
 import { useUpdateStore } from '../../store/updateStore';
 import { useShellMenuStore } from '../../store/shellMenuStore';
@@ -95,15 +97,26 @@ export const ProfileMenu: React.FC<{ onAction: (action: Exclude<ProfileAction, '
             {profile?.email ? <Text variant="meta" tone="secondary" numberOfLines={1}>{profile.email}</Text> : null}
           </View>
         </View>
-        <ScrollView contentContainerStyle={{ paddingBottom: insets.bottom + Space.lg }}>
-          <ListRow title={aboutRowTitle(updateWaiting)} subtitle="What's new, updates and feedback" icon="information-circle-outline" iconStyle="plain" chevron onPress={() => pick('about')} />
+        <ScrollView contentContainerStyle={{ paddingBottom: Space.lg }}>
+          <View style={styles.about}>
+            <ListRow
+              title={aboutRowTitle(updateWaiting)}
+              subtitle="What's new, updates and feedback"
+              icon="information-circle-outline"
+              iconStyle="plain"
+              trailing={updateWaiting ? <View style={styles.badge}><Text variant="caption" style={styles.badgeText}>Update</Text></View> : undefined}
+              chevron
+              onPress={() => pick('about')}
+            />
+          </View>
           {PROFILE_GROUPS.map(group => <View key={group.label}>
-            <Text variant="meta" tone="secondary" style={styles.group}>{group.label}</Text>
+            <Text variant="caption" tone="muted" style={styles.group}>{group.label}</Text>
             {group.items.map(item => (
               <ListRow key={item.id} title={item.title} subtitle={item.subtitle} icon={item.icon} iconStyle="plain" chevron onPress={() => pick(item.id)} />
             ))}
           </View>)}
         </ScrollView>
+        <Text variant="caption" tone="muted" style={[styles.version, { paddingBottom: insets.bottom + Space.sm }]}>LuvLyrics {appConfig.expo.version}</Text>
       </Animated.View>
       </GestureDetector>
       </GestureHandlerRootView>
@@ -115,10 +128,15 @@ export const ProfileMenu: React.FC<{ onAction: (action: Exclude<ProfileAction, '
 
 const styles = StyleSheet.create({
   scrim: { backgroundColor: Surface.scrim },
-  // 1.44.0 (owner, Spotify's): true black, no greys; the rows' icons stand alone (ListRow iconStyle="plain").
-  panel: { position: 'absolute', top: 0, bottom: 0, left: 0, backgroundColor: ShellFrost.menuBlack },
-  identity: { flexDirection: 'row', alignItems: 'center', gap: Space.md, paddingHorizontal: Space.md, paddingBottom: Space.md, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: Glass.hairline, marginBottom: Space.xs },
-  picture: { width: PROFILE_PICTURE * 1.5, height: PROFILE_PICTURE * 1.5, borderRadius: PROFILE_PICTURE * 0.75, backgroundColor: Glass.fillLight, alignItems: 'center', justifyContent: 'center' },
+  // True black like Spotify's side menu, closed off by a hairline on its right edge; no grey tiles behind the icons.
+  panel: { position: 'absolute', top: 0, bottom: 0, left: 0, backgroundColor: ShellFrost.menuBlack, borderRightWidth: StyleSheet.hairlineWidth, borderRightColor: Glass.hairline },
+  identity: { flexDirection: 'row', alignItems: 'center', gap: Space.md, paddingHorizontal: Space.md, paddingBottom: Space.md, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: Glass.hairline, marginBottom: Space.sm },
+  picture: { width: PROFILE_PICTURE * 1.75, height: PROFILE_PICTURE * 1.75, borderRadius: PROFILE_PICTURE * 0.875, backgroundColor: Glass.fillLight, alignItems: 'center', justifyContent: 'center' },
   identityText: { flex: 1, minWidth: 0 },
+  // The one featured row: About and updates, in an outlined card so a waiting update is the first thing the eye finds.
+  about: { marginHorizontal: Space.sm, borderRadius: Radius.sheet, borderWidth: StyleSheet.hairlineWidth, borderColor: Glass.hairlineStrong, overflow: 'hidden' },
+  badge: { paddingHorizontal: Space.xs, paddingVertical: Space.xxs, borderRadius: Radius.pill, backgroundColor: Signal.ink },
+  badgeText: { color: Signal.waveInk, fontWeight: '700' },
   group: { paddingHorizontal: Space.md, paddingTop: Space.lg, paddingBottom: Space.xs },
+  version: { paddingHorizontal: Space.md, paddingTop: Space.xs },
 });

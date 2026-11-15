@@ -1,7 +1,7 @@
 import type { SongSnapshot } from '../../shared/songRef.ts';
 import { connectError, errorCode, errorData, isUncertainFailure } from './errors.ts';
 import { createIntentQueue, type QueuedIntent } from './intentQueue.ts';
-import { applyConfirmedPatch, confirmedFromSnapshot, confirmedFromState, expectedPosition, planPatch, type ConfirmedState } from './playbackDiff.ts';
+import { applyConfirmedPatch, confirmedFromSnapshot, confirmedFromState, planPatch, type ConfirmedState } from './playbackDiff.ts';
 import { applyQueueEdit, isQueueEdit } from './queueEdit.ts';
 import { createServerClock } from './serverClock.ts';
 import { CONNECT_PROTOCOL_VERSION, QUEUE_EDIT_PROTOCOL_VERSION } from './types.ts';
@@ -113,13 +113,11 @@ export function createConnectSession({ transport, player, device: initialDevice,
   let reportQueued = false;
   let reportQueuedSeek = false;
   let lastPositionReportAt = 0;
-  let lastPosition: number | undefined;
   let confirmed: ConfirmedState | undefined;
   let serverRev: number | undefined;
   let inboxWorker = false;
   let inboxRetryCount = 0;
   let handoffInFlight = false;
-  let handoffCommandId: string | undefined;
   let idleTimer: unknown;
   /** The pause the idle timer was set for, so a snapshot with the same pause does not reset it. */
   let idleTimerFor: number | undefined;

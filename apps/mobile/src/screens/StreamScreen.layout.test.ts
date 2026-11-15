@@ -44,6 +44,15 @@ it('keeps Songs and Playlists in one fixed-width segmented control', () => {
   expect(recent).toContain("{ value: 'songs', label: 'Songs' }");
   expect(recent).toContain("{ value: 'playlists', label: 'Playlists' }");
   expect(recent).toContain('switch: { width: 164, flexShrink: 1 }');
+  // A shorter capsule than the full 48dp target, which the hit slop makes up.
+  expect(recent).toMatch(/label="Recent: songs or playlists" compact \/>/);
+});
+
+it('slides Songs and Playlists on one track, on the same spring as the switch', () => {
+  const recent = fs.readFileSync(path.join(__dirname, '../components/stream/RecentShelf.tsx'), 'utf8');
+  expect(recent).toContain('withSpring(index, Motion.spring.open)');
+  expect(recent).toMatch(/translateX: -position\.value \* width/);
+  expect(recent).not.toContain('runOnJS');
 });
 
 const flashList = () => nodes.find(node => ts.isJsxSelfClosingElement(node) && node.tagName.getText(file) === 'FlashList') as ts.JsxSelfClosingElement;

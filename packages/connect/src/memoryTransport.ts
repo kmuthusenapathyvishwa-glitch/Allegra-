@@ -436,7 +436,7 @@ export class MemoryTransport implements ConnectTransport {
       if (input.patch && hasPatch) {
         if (!state || state.activeDeviceId !== input.deviceId) throw connectError('device_not_active');
         if (input.rev !== state.rev) return { status: 'conflict', serverNow: now, currentRev: state.rev };
-        rev = this.applyPatch(input.deviceId, input.patch, now);
+        rev = this.applyPatch(input.patch, now);
       }
       row.status = 'done';
       this.clearHandoff(row);
@@ -579,7 +579,7 @@ export class MemoryTransport implements ConnectTransport {
     }
   }
 
-  private applyPatch(deviceId: string, patch: PlayerStatePatch, now: number): number {
+  private applyPatch(patch: PlayerStatePatch, now: number): number {
     const state = this.state;
     if (!state) return 0;
     const song = patch.song === undefined ? state.song : patch.song ?? undefined;

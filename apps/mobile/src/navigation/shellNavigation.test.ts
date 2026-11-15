@@ -40,7 +40,11 @@ describe('tabs and the Create sheet', () => {
 describe('profile menu', () => {
   it('holds every row the You tab had', () => {
     const ids = PROFILE_GROUPS.flatMap(group => group.items.map(item => item.id));
-    expect(ids).toEqual(expect.arrayContaining(['downloads', 'import', 'blends', 'luvlink', 'devices', 'settings']));
+    expect(ids).toEqual(expect.arrayContaining(['downloads', 'import', 'settings']));
+    // Create has Blends and LuvLink and the Stream header has Connect devices: the menu does not repeat them.
+    expect(ids).not.toEqual(expect.arrayContaining(['blends']));
+    expect(ids).not.toContain('luvlink');
+    expect(ids).not.toContain('devices');
     // Your DJ is archived in the phone app (apps/mobile/archive/dj): it must not come back through the menu by accident.
     expect(ids).not.toContain('dj');
     expect(PROFILE_GROUPS.at(-1)?.items.at(-1)?.title).toBe('Settings and privacy');

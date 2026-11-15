@@ -24,7 +24,7 @@ import { FlashList } from '@shopify/flash-list';
 import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
 import React, { useCallback, useEffect, useState } from 'react';
-import { Share, StyleSheet, TextInput, useWindowDimensions, View, type LayoutChangeEvent, type NativeScrollEvent, type NativeSyntheticEvent } from 'react-native';
+import { StyleSheet, TextInput, useWindowDimensions, View, type LayoutChangeEvent, type NativeScrollEvent, type NativeSyntheticEvent } from 'react-native';
 import DraggableFlatList, { RenderItemParams } from 'react-native-draggable-flatlist';
 import Animated, {
   Extrapolation,
@@ -52,7 +52,7 @@ import { withoutCopies } from '../services/offlinePlaylistPlan';
 import { OfflineControl } from '../components/playlist/OfflineControl';
 import { CoverFlipCard } from '../components/playlist/CoverFlipCard';
 import { ShareSheet } from '../components/share/ShareSheet';
-import { coverSizeFor, FIND_BAR_HEIGHT, findFiller, PLAYLIST_WASH_STOPS, playlistLength, playlistShareText, playlistWash, settleFind } from '../components/playlist/playlistPage';
+import { coverSizeFor, FIND_BAR_HEIGHT, findFiller, PLAYLIST_WASH_STOPS, playlistLength, playlistWash, settleFind } from '../components/playlist/playlistPage';
 import { LIKED_PLAYLIST_ID } from '../services/sync/plan';
 import { useOnlineLibraryStore } from '../store/onlineLibraryStore';
 import { playerControls, usePlayerStore } from '../store/playerStore';

@@ -6,7 +6,7 @@ import { SongRow as SharedSongRow } from '../../ui/SongRow';
  */
 import { Ionicons } from '@expo/vector-icons';
 import React, { useEffect } from 'react';
-import { PixelRatio, StyleSheet, Text, View } from 'react-native';
+import { PixelRatio, StyleSheet, View } from 'react-native';
 import Animated, {
   useAnimatedStyle,
   useReducedMotion,
@@ -15,8 +15,6 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 import { Glass, Motion, Radius, Signal, Space } from '../../constants/allegraTheme';
-import Artwork from '../allegra/Artwork';
-import { Tactile, TactileRow } from '../allegra/motion';
 import NativeTrackRow, { nativeTrackRowAvailable } from './NativeTrackRow';
 import { formatTrackDuration, shouldUseNativeTrackRow } from './trackRowPayload';
 

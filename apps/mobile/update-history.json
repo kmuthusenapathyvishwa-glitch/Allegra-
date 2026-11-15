@@ -1,6 +1,23 @@
 {
   "entries": [
     {
+      "version": "1.69.2",
+      "description": "A tidier Stream header and profile menu, a smoother updates menu, and a bottom bar that fades into the page",
+      "changelog": [
+        {
+          "title": "Improved",
+          "items": [
+            "The Songs and Playlists switch in Stream is a little smaller and slides smoothly, and the six tiles under it slide with it",
+            "Connect devices opens on a solid dark sheet instead of a see-through one",
+            "The updates menu from the LuvLyrics logo shows Update and Install at the top, and Recent updates folds open with an arrow",
+            "The profile menu is a neater side menu, without Blends, LuvLink and Connect devices, which Create and the Stream header already have",
+            "The bottom bar fades into the page instead of sitting on a solid black block",
+            "Removed leftover code the app no longer uses"
+          ]
+        }
+      ]
+    },
+    {
       "version": "1.69.1",
       "description": "Large display size keeps the full screen and bottom navigation visible",
       "changelog": [
@@ -10,7 +27,9 @@
             "Large display size no longer cuts off the right edge or bottom navigation on affected phones"
           ]
         }
-      ]
+      ],
+      "sourceCommit": "c2ca5e7a50d974678d7707b3df1374bb1843b9fa",
+      "rollbackAsset": "LuvLyrics-rollback-1.69.1.apk"
     },
     {
       "version": "1.69.0",
@@ -61,23 +80,6 @@
       ],
       "sourceCommit": "65e90b5756edbc4c177e4613ae3479021fa691e0",
       "rollbackAsset": "LuvLyrics-rollback-1.68.2.apk"
-    },
-    {
-      "version": "1.68.1",
-      "sourceCommit": "de9f2675da5227ae31d86e3a5d118531e34d1b5e",
-      "rollbackAsset": "LuvLyrics-rollback-1.68.1.apk",
-      "description": "Search can retry when the catalog cannot be reached, and small buttons are easier to tap",
-      "changelog": [
-        {
-          "title": "Improved",
-          "items": [
-            "Search tells you when the catalog cannot be reached, with a Try again button",
-            "The close button on the info card works",
-            "Small buttons are easier to tap, including the info buttons and filter chips",
-            "Text in Search and the Now Playing controls no longer gets cut off at larger sizes"
-          ]
-        }
-      ]
     }
   ]
 }

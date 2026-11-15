@@ -18,7 +18,6 @@ export const SHARED_COPIES = [
   'identity.ts',
   'blendDecay.ts',
   'importParse.ts',
-  'importZip.ts',
   'blendTypes.ts',
   'blendTaste.ts',
   'blendMatch.ts',
@@ -30,7 +29,7 @@ export const SHARED_COPIES = [
   'listenSignal.ts',
   'lyricsText.ts',
   'lyricSync.ts',
-  'scrobble.ts',
+  'moodPrompts.ts',
   'trackVersion.ts'
 ];
 

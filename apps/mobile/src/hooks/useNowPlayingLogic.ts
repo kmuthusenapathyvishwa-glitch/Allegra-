@@ -6,7 +6,7 @@ import { usePlayerStore } from '../store/playerStore';
 import { handleOwnedLuvLinkSeek, handleOwnedLuvLinkToggle, notifyOwnedLuvLinkUserSeek } from '../services/luvLink/sync';
 import { skipBackward as sharedSkipBackward, skipForward as sharedSkipForward } from '../services/player/skipControls';
 import { notifyLuvLinkUserSeek } from '../services/luvLink/legacy/sync';
-import { positionSV, durationSV, isSeeking } from '../playback/positionBus';
+import { positionSV, isSeeking } from '../playback/positionBus';
 import { useSongsStore } from '../store/songsStore';
 import { useArtHistoryStore } from '../store/artHistoryStore';
 import { useSettingsStore } from '../store/settingsStore';

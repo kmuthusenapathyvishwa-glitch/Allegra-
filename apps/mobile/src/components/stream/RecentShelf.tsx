@@ -1,11 +1,12 @@
 /**
  * Stream's "Recent" shelf and the header switch that drives it. The switch is two chips in the header (Songs,
- * Playlists); the shelf is the same six-tile grid for either, and changing the view fades the tiles out and the new
- * ones in (opacity only, 100 ms out then 160 ms in; Reduce Motion swaps at once).
+ * Playlists); the shelf is the same six-tile grid for either. Both grids sit side by side on one track: changing the
+ * view slides the track a screen width on the same spring as the switch's plate, the grids cross-fading as they pass,
+ * so one smooth move carries Songs out and Playlists in (and back, from wherever it is). Reduce Motion swaps at once.
  */
 import React, { useEffect, useState } from 'react';
-import { StyleSheet, View } from 'react-native';
-import Animated, { runOnJS, useAnimatedStyle, useReducedMotion, useSharedValue, withTiming } from 'react-native-reanimated';
+import { StyleSheet, View, useWindowDimensions } from 'react-native';
+import Animated, { SharedValue, useAnimatedStyle, useReducedMotion, useSharedValue, withSpring } from 'react-native-reanimated';
 import { Motion, Space } from '../../constants/allegraTheme';
 import type { RecentView } from '../../services/stream/recentItems';
 import { Segmented, Text } from '../../ui';
@@ -18,7 +19,7 @@ const RECENT_OPTIONS = [
 
 export const RecentSwitch: React.FC<{ view: RecentView; onChange: (view: RecentView) => void }> = ({ view, onChange }) => (
   <View style={styles.switch}>
-    <Segmented<RecentView> value={view} options={RECENT_OPTIONS} onChange={onChange} label="Recent: songs or playlists" />
+    <Segmented<RecentView> value={view} options={RECENT_OPTIONS} onChange={onChange} label="Recent: songs or playlists" compact />
   </View>
 );
 
@@ -31,45 +32,72 @@ interface ShelfProps {
   onPressPlaylist: (index: number) => void;
 }
 
+interface PaneProps {
+  index: number;
+  active: boolean;
+  width: number;
+  position: SharedValue<number>;
+  onHeight: (height: number) => void;
+  children: React.ReactNode;
+}
+
+/** One grid on the track: fades with its distance from the view, and is out of reach (touch and screen reader) when it is not the one shown. */
+const Pane: React.FC<PaneProps> = ({ index, active, width, position, onHeight, children }) => {
+  const fade = useAnimatedStyle(() => ({ opacity: Math.max(0, 1 - Math.abs(position.value - index)) }));
+  return (
+    <Animated.View
+      style={[{ width }, fade]}
+      pointerEvents={active ? 'auto' : 'none'}
+      accessibilityElementsHidden={!active}
+      importantForAccessibility={active ? 'auto' : 'no-hide-descendants'}
+      onLayout={e => onHeight(e.nativeEvent.layout.height)}
+    >
+      {children}
+    </Animated.View>
+  );
+};
+
+const emptyNote = (view: RecentView): string =>
+  view === 'songs' ? 'Songs you play will show up here.' : 'Playlists you make or change will show up here.';
+
 export const RecentShelf: React.FC<ShelfProps> = ({ view, songs, playlists, onPressSong, onLongPressSong, onPressPlaylist }) => {
   const reduce = useReducedMotion();
-  const [shown, setShown] = useState<RecentView>(view);
-  const opacity = useSharedValue(1);
+  // The shelf is a full-width section of the feed.
+  const { width } = useWindowDimensions();
+  const index = view === 'songs' ? 0 : 1;
+  const position = useSharedValue(index);
+  const [heights, setHeights] = useState<readonly [number, number]>([0, 0]);
 
   useEffect(() => {
-    if (view === shown) return;
-    if (reduce) { setShown(view); return; }
-    opacity.value = withTiming(0, { duration: Motion.duration.instant }, finished => {
-      if (finished) runOnJS(setShown)(view);
-    });
-  }, [view, shown, reduce, opacity]);
+    if (reduce) { position.value = index; return; }
+    position.value = withSpring(index, Motion.spring.open);
+  }, [index, reduce, position]);
 
-  useEffect(() => {
-    if (reduce) { opacity.value = 1; return; }
-    opacity.value = withTiming(1, { duration: Motion.duration.fast });
-  }, [shown, reduce, opacity]);
+  const track = useAnimatedStyle(() => ({ transform: [{ translateX: -position.value * width }] }), [width]);
+  const setHeight = (pane: 0 | 1) => (height: number) => setHeights(current => (current[pane] === height ? current : pane === 0 ? [height, current[1]] : [current[0], height]));
 
-  const fade = useAnimatedStyle(() => ({ opacity: opacity.value }), [opacity]);
-  const empty = shown === 'songs' ? songs.length === 0 : playlists.length === 0;
+  const grid = (kind: RecentView, items: TrackItem[], onPress: (i: number) => void, onLongPress?: (i: number) => void) => items.length === 0
+    ? <View style={styles.empty}><Text variant="secondary" tone="secondary">{emptyNote(kind)}</Text></View>
+    : <ShortcutGrid items={items} onPress={onPress} onLongPress={onLongPress} />;
 
+  // The section is as tall as the grid showing, so a short Playlists grid leaves no gap under it.
   return (
-    <Animated.View style={fade}>
-      {empty ? (
-        <View style={styles.empty}>
-          <Text variant="secondary" tone="secondary">
-            {shown === 'songs' ? 'Songs you play will show up here.' : 'Playlists you make or change will show up here.'}
-          </Text>
-        </View>
-      ) : shown === 'songs' ? (
-        <ShortcutGrid items={songs} onPress={onPressSong} onLongPress={onLongPressSong} />
-      ) : (
-        <ShortcutGrid items={playlists} onPress={onPressPlaylist} />
-      )}
-    </Animated.View>
+    <View style={[styles.window, heights[index] > 0 && { height: heights[index] }]}>
+      <Animated.View style={[styles.track, { width: width * 2 }, track]}>
+        <Pane index={0} active={view === 'songs'} width={width} position={position} onHeight={setHeight(0)}>
+          {grid('songs', songs, onPressSong, onLongPressSong)}
+        </Pane>
+        <Pane index={1} active={view === 'playlists'} width={width} position={position} onHeight={setHeight(1)}>
+          {grid('playlists', playlists, onPressPlaylist)}
+        </Pane>
+      </Animated.View>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
   switch: { width: 164, flexShrink: 1 },
+  window: { overflow: 'hidden' },
+  track: { flexDirection: 'row', alignItems: 'flex-start' },
   empty: { paddingHorizontal: Space.md, paddingVertical: Space.lg },
 });

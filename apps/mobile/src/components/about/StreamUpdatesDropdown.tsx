@@ -2,9 +2,9 @@ import { Image } from 'expo-image';
 import React, { useState } from 'react';
 import { Modal, ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useReducedMotion } from 'react-native-reanimated';
+import Animated, { LinearTransition, useReducedMotion } from 'react-native-reanimated';
 
-import { Glass, Radius, Signal, Space, Surface } from '../../constants/allegraTheme';
+import { Glass, Motion, Radius, Signal, Space, Surface } from '../../constants/allegraTheme';
 import { Tactile } from '../allegra/motion';
 import UpdatePanel from './UpdatePanel';
 
@@ -62,7 +62,11 @@ export function StreamUpdatesDropdown({ topOffset, rightOffset }: Props): React.
           >
             <View />
           </Tactile>
-          <View style={[styles.dropdown, { top: topOffset, right: rightOffset, width: panelWidth, maxHeight: panelMaxHeight }]}>
+          {/* The panel grows and shrinks with its content (the Recent updates arrow) instead of jumping. */}
+          <Animated.View
+            layout={reduceMotion ? undefined : LinearTransition.duration(Motion.duration.base)}
+            style={[styles.dropdown, { top: topOffset, right: rightOffset, width: panelWidth, maxHeight: panelMaxHeight }]}
+          >
             <ScrollView
               style={styles.scroll}
               contentContainerStyle={styles.content}
@@ -72,7 +76,7 @@ export function StreamUpdatesDropdown({ topOffset, rightOffset }: Props): React.
             >
               <UpdatePanel visible={open} dropdown onClose={close} />
             </ScrollView>
-          </View>
+          </Animated.View>
         </View>
       </Modal>
     </>

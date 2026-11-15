@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { ActivityIndicator, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
-import { PlayerSheet, SheetScrollView } from '../player/PlayerSheet';
+import { Sheet, SheetScrollView } from '../../ui/Sheet';
 import { useConnect } from '../../services/connect/ConnectProvider';
 import type { TransferResult } from '../../../../../packages/connect/src/index';
 import { useAccount } from '../../services/account/AccountProvider';
@@ -173,11 +173,12 @@ export const ConnectDeviceList: React.FC<{ onClose: () => void }> = ({ onClose }
 export const ConnectDeviceSheet: React.FC = () => {
   const connect = useConnect();
   return (
-    <PlayerSheet visible={connect.devicesVisible} title="Connect devices" tall onClose={connect.closeDevices}>
+    // The app's solid dark sheet, not the player's see-through glass: the list reads the same over any cover or page.
+    <Sheet visible={connect.devicesVisible} title="Connect devices" tall onClose={connect.closeDevices}>
       <SheetScrollView showsVerticalScrollIndicator={false}>
         <ConnectDeviceList onClose={connect.closeDevices} />
       </SheetScrollView>
-    </PlayerSheet>
+    </Sheet>
   );
 };
 

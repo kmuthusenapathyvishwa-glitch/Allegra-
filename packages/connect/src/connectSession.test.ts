@@ -628,7 +628,7 @@ test('disposing settles in-flight work and clears watches and timers', async () 
 });
 
 test('player reports leave the server-owned position anchor out of the patch', async () => {
-  const { clock, transport, playerA, sessionA, sessionB } = await sessionPair({
+  const { transport, playerA, sessionA, sessionB } = await sessionPair({
     transportFactory: (clock) => new ReportInspectTransport(() => clock.now())
   });
   playerA.update({ volume: 0.7 });

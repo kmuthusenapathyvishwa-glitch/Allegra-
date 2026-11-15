@@ -3,7 +3,7 @@ import { estimateSerializedByteLength } from './developmentTrace.ts';
 import { connectError } from './errors.ts';
 import { isFailureCode } from './errors.ts';
 import type {
-  CommandOutcome, ConnectDevice, ConnectPlayerState, ConnectSnapshot, ConnectTraceWriter,
+  CommandOutcome, ConnectDevice, ConnectPlayerState, ConnectTraceWriter,
   ConnectTransport, DeviceRegistration, InboxCommand, PlayerSnapshot, PlayerStatePatch,
   PrepareResult, RemoteCommand, RepeatMode, TransferState
 } from './types.ts';

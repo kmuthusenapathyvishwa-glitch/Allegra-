@@ -111,13 +111,14 @@ export const ShellFrost = {
    */
   miniBase: '#050505',
   miniRim: 'rgba(255, 255, 255, 0.08)',
-  /** The lower navigation rests on black, with a little transparency at its top edge. */
-  navSurfaceColors: ['rgba(0, 0, 0, 0.88)', '#000000'] as const,
-  navSurfaceStops: [0, 1] as const,
-  /** The page fades into the nav surface above it; the bottom remains solid black. */
-  navFadeColors: ['rgba(0, 0, 0, 0)', 'rgba(0, 0, 0, 0.45)', '#000000'] as const,
-  navFadeStops: [0, 0.32, 1] as const,
-  navFade: 80,
+  /**
+   * The bottom navigation is one scrim, not a bar: clear at the top, near-black at the very bottom, so the page's own
+   * artwork and rows fade into it (Spotify's bottom). Six eased stops instead of two, so there is no hard edge and no
+   * banding. It reaches `navScrimReach` above the bar, behind the mini player.
+   */
+  navScrimColors: ['rgba(0, 0, 0, 0)', 'rgba(0, 0, 0, 0.12)', 'rgba(0, 0, 0, 0.36)', 'rgba(0, 0, 0, 0.64)', 'rgba(0, 0, 0, 0.88)', 'rgba(0, 0, 0, 0.98)'] as const,
+  navScrimStops: [0, 0.2, 0.4, 0.6, 0.8, 1] as const,
+  navScrimReach: 96,
   /**
    * Liked songs' header (1.43.0, owner): Spotify's layout, but a smooth forest-green wash instead of its blue, from the
    * top of the screen down into the page's black. No cover.

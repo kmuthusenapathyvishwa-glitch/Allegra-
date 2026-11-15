@@ -7,7 +7,7 @@ jest.mock('react-native-reanimated', () => ({ Easing: { bezier: () => (t: number
 
 import * as fs from 'fs';
 import * as path from 'path';
-import { Control, Radius } from '../constants/allegraTheme';
+import { Control, Radius, ShellFrost } from '../constants/allegraTheme';
 import { chipLeadingIcon, COMPACT_HEIGHT, identityMeta, songRowSubtitle } from './round7Rules';
 
 const SRC = path.resolve(__dirname, '..');
@@ -81,11 +81,13 @@ describe('items 3 and 8: the bottom surface and navigation', () => {
     expect(player).toMatch(/borderTopWidth: StyleSheet\.hairlineWidth, borderColor: ShellFrost\.miniRim/);
     expect(player).toMatch(/playButtonOffset: \{ marginRight: MINI_PLAY_OFFSET \}/);
     const bar = read('components/V6TabBar.tsx');
-    expect(bar).toMatch(/colors=\{ShellFrost\.navSurfaceColors\}/);
-    expect(bar).toMatch(/colors=\{ShellFrost\.navFadeColors\}/);
-    expect(bar).toMatch(/navTopEdge/);
-    expect(bar).toMatch(/<LinearGradient pointerEvents="none" colors=\{ShellFrost\.navFadeColors\} locations=\{ShellFrost\.navFadeStops\}/);
-    expect(bar).toMatch(/top: -ShellFrost\.navFade/);
+    // One scrim, clear at its top and near-black at the very bottom, with no top rim line to mark where the bar starts.
+    expect(bar).toMatch(/<LinearGradient pointerEvents="none" colors=\{ShellFrost\.navScrimColors\} locations=\{ShellFrost\.navScrimStops\}/);
+    expect(bar).toMatch(/height: barHeight \+ ShellFrost\.navScrimReach/);
+    expect(bar).not.toMatch(/navTopEdge/);
+    expect(ShellFrost.navScrimColors[0]).toBe('rgba(0, 0, 0, 0)');
+    expect(ShellFrost.navScrimColors.at(-1)).toBe('rgba(0, 0, 0, 0.98)');
+    expect(ShellFrost.navScrimColors).toHaveLength(ShellFrost.navScrimStops.length);
   });
 
   it('shows Liked songs with no cover over a forest-green wash, a big title and a round Play (1.43.0)', () => {

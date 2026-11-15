@@ -64,6 +64,7 @@ import { persistLyricsSyncDrafts, readLyricsSyncDrafts } from './lib/lyricAlign/
 import { useSongRadio } from './hooks/useSongRadio';
 import { accountDisplayName, isResolvingAccount, recallAccountName, rememberAccountName } from './lib/accountState';
 import { upcomingSong, useAudioPlayer } from './hooks/useAudioPlayer';
+import { useForgetImportOnSignOut } from './hooks/useForgetImportOnSignOut';
 import { useLiveKaraoke } from './hooks/useLiveKaraoke';
 import { useMediaSession } from './hooks/useMediaSession';
 import { useNarrowViewport } from './hooks/useNarrowViewport';
@@ -640,6 +641,7 @@ export default function App() {
     }
   }, [accountResolving, account.profile]);
   const knownAccount = !accountResolving && account.profile && !account.profile.isGuest ? account.profile : null;
+  useForgetImportOnSignOut(knownAccount?.userId ?? null);
   const chipName = knownAccount ? accountDisplayName(knownAccount) : accountResolving ? rememberedName : null;
 
   // A remote track change can write recent history on the phone. Give that

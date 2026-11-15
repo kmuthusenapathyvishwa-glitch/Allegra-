@@ -65,7 +65,7 @@ import { useSearchHistoryStore } from '../store/searchHistoryStore';
 import { useSettingsStore } from '../store/settingsStore';
 import { useSongsStore } from '../store/songsStore';
 import { TabScreenProps } from '../types/navigation';
-import { Playlist, Song, UnifiedSong } from '../types/song';
+import { Song, UnifiedSong } from '../types/song';
 import * as Haptics from '../utils/haptics';
 import { ProfileButton } from '../components/nav/ProfileButton';
 import { onlineStatus } from './searchStatus';
