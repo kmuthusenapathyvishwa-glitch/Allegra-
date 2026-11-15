@@ -23,6 +23,31 @@
       ]
     },
     {
+      "version": "1.68.2",
+      "description": "New versions show up in About again, and every change from 1.68.0 and 1.68.1 is in this build",
+      "changelog": [
+        {
+          "title": "New",
+          "items": [
+            "Connect ListenBrainz in Settings to keep a copy of what you listen to on your own profile",
+            "Your full history stays on this phone, and nothing is sent until you connect"
+          ]
+        },
+        {
+          "title": "Improved",
+          "items": [
+            "The app finds new versions reliably, so updates show up in About",
+            "Search tells you when the catalog cannot be reached, with a Try again button",
+            "The close button on the info card works",
+            "Small buttons are easier to tap, including the info buttons and filter chips",
+            "Text in Search and the Now Playing controls no longer gets cut off at larger sizes"
+          ]
+        }
+      ],
+      "sourceCommit": "65e90b5756edbc4c177e4613ae3479021fa691e0",
+      "rollbackAsset": "LuvLyrics-rollback-1.68.2.apk"
+    },
+    {
       "version": "1.68.1",
       "sourceCommit": "de9f2675da5227ae31d86e3a5d118531e34d1b5e",
       "rollbackAsset": "LuvLyrics-rollback-1.68.1.apk",
@@ -50,23 +75,6 @@
           "items": [
             "Connect ListenBrainz in Settings to keep a copy of what you listen to on your own profile",
             "Your full history stays on this phone, and nothing is sent until you connect"
-          ]
-        }
-      ]
-    },
-    {
-      "version": "1.67.0",
-      "sourceCommit": "610c689f967b9a62f4a57db56f9f404c5273f1ff",
-      "rollbackAsset": "LuvLyrics-rollback-1.67.0.apk",
-      "description": "Closing the player and reading messages is smoother and clearer",
-      "changelog": [
-        {
-          "title": "Improved",
-          "items": [
-            "Closing the player now lands on one full-width mini-player",
-            "Error messages are written in plain words and counts read correctly, such as 1 song",
-            "Library tabs stay steady when you switch between them",
-            "The lyrics editor asks before you drop unsaved changes"
           ]
         }
       ]
