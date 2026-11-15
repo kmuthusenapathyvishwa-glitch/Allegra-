@@ -1,6 +1,18 @@
 {
   "entries": [
     {
+      "version": "1.69.1",
+      "description": "Large display size keeps the full screen and bottom navigation visible",
+      "changelog": [
+        {
+          "title": "Fixed",
+          "items": [
+            "Large display size no longer cuts off the right edge or bottom navigation on affected phones"
+          ]
+        }
+      ]
+    },
+    {
       "version": "1.69.0",
       "description": "The player follows your finger, replayed songs use less data, and Stream has a clearer header",
       "changelog": [
@@ -21,7 +33,9 @@
             "The app finds new versions reliably, so updates show up in About"
           ]
         }
-      ]
+      ],
+      "sourceCommit": "1a6bb6ca9a870d9ffab38474fc337876fa306852",
+      "rollbackAsset": "LuvLyrics-rollback-1.69.0.apk"
     },
     {
       "version": "1.68.2",
@@ -61,21 +75,6 @@
             "The close button on the info card works",
             "Small buttons are easier to tap, including the info buttons and filter chips",
             "Text in Search and the Now Playing controls no longer gets cut off at larger sizes"
-          ]
-        }
-      ]
-    },
-    {
-      "version": "1.68.0",
-      "sourceCommit": "584a5df8b9ef7aca8e9f61d83a238d24a4e6c7d0",
-      "rollbackAsset": "LuvLyrics-rollback-1.68.0.apk",
-      "description": "You can copy your listening history to your own ListenBrainz profile",
-      "changelog": [
-        {
-          "title": "New",
-          "items": [
-            "Connect ListenBrainz in Settings to keep a copy of what you listen to on your own profile",
-            "Your full history stays on this phone, and nothing is sent until you connect"
           ]
         }
       ]

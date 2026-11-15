@@ -62,8 +62,9 @@ class MainApplication : Application(), ReactApplication {
 
   override fun onConfigurationChanged(newConfig: Configuration) {
     // The system has just recomputed the density from the device: the chosen Display size goes back on first.
-    runCatching { DisplayScale.apply(this) }
-    super.onConfigurationChanged(newConfig)
-    ApplicationLifecycleDispatcher.onConfigurationChanged(this, newConfig)
+    val config = DisplayScale.configuration(this, newConfig)
+    runCatching { DisplayScale.apply(this, resources, config) }
+    super.onConfigurationChanged(config)
+    ApplicationLifecycleDispatcher.onConfigurationChanged(this, config)
   }
 }
