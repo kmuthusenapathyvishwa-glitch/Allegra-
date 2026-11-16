@@ -36,15 +36,49 @@ function git(root, args) {
   const result = spawnSync('git', args, { cwd: root, encoding: 'utf8', windowsHide: true });
   if (result.error) throw result.error;
   if (result.status !== 0) throw new Error(`git ${args[0]} failed`);
-  return result.stdout.trim();
+  // Porcelain v1 uses its first column to distinguish staged and unstaged changes.
+  // Remove only Git's final newline; trim() would erase a leading status column.
+  return result.stdout.replace(/\r?\n$/, '');
+}
+
+export function parseStatusPorcelain(status) {
+  return status ? status.split(/\r?\n/) : [];
+}
+
+export function readGitStatusPorcelain(root) {
+  return parseStatusPorcelain(git(root, ['status', '--porcelain=v1', '--untracked-files=all']));
+}
+
+function resolveCompiler(root) {
+  const rootRequire = createRequire(path.join(root, 'package.json'));
+  const compilerPath = fs.realpathSync(rootRequire.resolve('typescript'));
+  const compiler = rootRequire('typescript');
+  const packagePath = path.resolve(path.dirname(compilerPath), '..', 'package.json');
+  const compilerPackage = JSON.parse(fs.readFileSync(packagePath, 'utf8'));
+  const declaredVersion = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'))
+    .devDependencies?.typescript;
+  if (!/^\d+\.\d+\.\d+$/.test(declaredVersion ?? '') || declaredVersion !== compilerPackage.version || compiler.version !== compilerPackage.version) {
+    throw new Error(`root TypeScript compiler does not match the exact package pin (${declaredVersion ?? 'missing'})`);
+  }
+  return {
+    compiler,
+    provenance: {
+      package: 'typescript',
+      version: compiler.version,
+      packageVersion: compilerPackage.version,
+      resolvedPath: path.relative(root, compilerPath).split(path.sep).join('/')
+    }
+  };
 }
 
 function loadDesignGuardCounts(root) {
   const sourcePath = path.join(root, GUARD_PATH);
   const source = fs.readFileSync(sourcePath, 'utf8');
-  // TypeScript is declared by the mobile app, whose guard this benchmark executes.
-  const ts = createRequire(path.join(root, 'apps/mobile/package.json'))('typescript');
-  const compiled = ts.transpileModule(source, {
+  const { compiler: ts, provenance } = resolveCompiler(root);
+  // Expose private measurement helpers only in memory. The checked-in guard remains byte-for-byte
+  // unchanged, while its actual counting and inventory implementations are executed directly.
+  const instrumentedSource = `${source}\nmodule.exports.countAll = countAll;\nmodule.exports.listSourceFiles = () => sourceFiles(SRC).map(rel).sort();\n`;
+  const compiled = ts.transpileModule(instrumentedSource, {
     compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 }
   }).outputText;
   const module = { exports: {} };
@@ -70,7 +104,7 @@ function loadDesignGuardCounts(root) {
   vm.runInNewContext(compiled, sandbox, { filename: GUARD_PATH });
   if (typeof module.exports.countAll !== 'function') throw new Error('design guard countAll export was not found');
   if (typeof module.exports.listSourceFiles !== 'function') throw new Error('design guard source inventory export was not found');
-  return { counts: module.exports.countAll(), sourceFiles: module.exports.listSourceFiles(), typescriptVersion: ts.version };
+  return { counts: module.exports.countAll(), sourceFiles: module.exports.listSourceFiles(), compiler: provenance };
 }
 
 export function hashSourceInputs(root, sourceFiles) {
@@ -134,11 +168,11 @@ export function resolveOutputPath(root, outputFile) {
 export function collectBaseline({ root = ROOT, outputFile, now = () => new Date() } = {}) {
   const absoluteRoot = path.resolve(root);
   const commit = git(absoluteRoot, ['rev-parse', 'HEAD']);
-  const status = git(absoluteRoot, ['status', '--porcelain=v1', '--untracked-files=all']);
+  const statusPorcelain = readGitStatusPorcelain(absoluteRoot);
   const guardSource = fs.readFileSync(path.join(absoluteRoot, GUARD_PATH));
   const baselineSource = fs.readFileSync(path.join(absoluteRoot, BASELINE_PATH));
   const scriptSource = fs.readFileSync(SCRIPT_PATH);
-  const { counts, sourceFiles, typescriptVersion } = loadDesignGuardCounts(absoluteRoot);
+  const { counts, sourceFiles, compiler } = loadDesignGuardCounts(absoluteRoot);
   const baseline = JSON.parse(baselineSource.toString('utf8'));
   const report = {
     schemaVersion: 1,
@@ -146,15 +180,15 @@ export function collectBaseline({ root = ROOT, outputFile, now = () => new Date(
     repository: {
       commit,
       branch: git(absoluteRoot, ['branch', '--show-current']),
-      dirty: status.length > 0,
-      statusPorcelain: status ? status.split(/\r?\n/) : []
+      dirty: statusPorcelain.length > 0,
+      statusPorcelain
     },
     tool: { path: 'scripts/bench/allegra-baseline.mjs', sha256: sha256(scriptSource) },
     designGuard: {
       evidenceClass: 'current-source-repro',
       path: GUARD_PATH,
       sha256: sha256(guardSource),
-      typescriptVersion,
+      compiler,
       sourceInputs: hashSourceInputs(absoluteRoot, sourceFiles),
       baselinePath: BASELINE_PATH,
       baselineSha256: sha256(baselineSource),

@@ -1,10 +1,11 @@
 import assert from 'node:assert/strict';
+import { execFileSync } from 'node:child_process';
 import { mkdtempSync, mkdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
-import { collectBaseline, defaultOutputPath, hashSourceInputs, resolveOutputPath } from '../../scripts/bench/allegra-baseline.mjs';
+import { collectBaseline, defaultOutputPath, hashSourceInputs, parseStatusPorcelain, readGitStatusPorcelain, resolveOutputPath } from '../../scripts/bench/allegra-baseline.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const baselinePath = path.join(root, 'apps/mobile/src/designGuards.baseline.json');
@@ -28,7 +29,10 @@ test('benchmark reports source-backed guard counts without modifying its inputs'
   assert.match(report.tool.sha256, /^[0-9a-f]{64}$/);
   assert.match(report.designGuard.sha256, /^[0-9a-f]{64}$/);
   assert.match(report.designGuard.baselineSha256, /^[0-9a-f]{64}$/);
-  assert.match(report.designGuard.typescriptVersion, /^\d+\.\d+\.\d+/);
+  assert.equal(report.designGuard.compiler.package, 'typescript');
+  assert.equal(report.designGuard.compiler.version, '5.9.3');
+  assert.equal(report.designGuard.compiler.packageVersion, report.designGuard.compiler.version);
+  assert.equal(report.designGuard.compiler.resolvedPath, 'node_modules/typescript/lib/typescript.js');
   assert.ok(report.designGuard.sourceInputs.length > 0);
   assert.deepEqual(report.designGuard.sourceInputs.map(input => input.path), [...report.designGuard.sourceInputs.map(input => input.path)].sort());
   assert.ok(report.designGuard.sourceInputs.some(input => input.path.endsWith('.tsx')));
@@ -56,6 +60,28 @@ test('benchmark reports source-backed guard counts without modifying its inputs'
   }
   assert.deepEqual(report.notMeasured.includes('Runtime or device performance'), true);
   assert.doesNotMatch(JSON.stringify(report), /[A-Za-z]:[\\/](?:Users|dev)[\\/]/);
+});
+
+test('porcelain status parsing preserves Git status columns and splits only records', () => {
+  assert.deepEqual(parseStatusPorcelain(' M apps/mobile/src/Changed.tsx\n?? new-file.ts'), [
+    ' M apps/mobile/src/Changed.tsx',
+    '?? new-file.ts'
+  ]);
+  assert.deepEqual(parseStatusPorcelain(''), []);
+});
+
+test('Git status collection preserves the unstaged-change column from porcelain output', () => {
+  const temp = mkdtempSync(path.join(os.tmpdir(), 'allegra-benchmark-git-'));
+  try {
+    execFileSync('git', ['init', '--quiet', temp]);
+    writeFileSync(path.join(temp, 'tracked.txt'), 'before\n');
+    execFileSync('git', ['-C', temp, 'add', 'tracked.txt']);
+    execFileSync('git', ['-C', temp, '-c', 'user.name=Benchmark Test', '-c', 'user.email=benchmark@example.invalid', 'commit', '--quiet', '-m', 'base']);
+    writeFileSync(path.join(temp, 'tracked.txt'), 'after\n');
+    assert.deepEqual(readGitStatusPorcelain(temp), [' M tracked.txt']);
+  } finally {
+    rmSync(temp, { recursive: true, force: true });
+  }
 });
 
 test('benchmark names output by the full commit and rejects paths outside the repository', () => {

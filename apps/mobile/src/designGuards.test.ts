@@ -74,8 +74,6 @@ const sourceFiles = (dir: string): string[] =>
     return /\.tsx?$/.test(entry.name) && !/\.test\.tsx?$/.test(entry.name) && !entry.name.endsWith('.d.ts') ? [full] : [];
   });
 
-export const listSourceFiles = (): string[] => sourceFiles(SRC).map(rel).sort();
-
 const rel = (file: string) => path.relative(SRC, file).split(path.sep).join('/');
 const isLibraryFile = (file: string) => LIBRARY.some(dir => file.startsWith(dir));
 
@@ -541,8 +539,8 @@ const countFileRule = (ruleName: string, file: string, text: string): number => 
 
 export const countAll = (): Record<Rule, Record<string, number>> => {
   const counts = Object.fromEntries(Object.keys(PATTERNS).map(r => [r, {}])) as Record<Rule, Record<string, number>>;
-  for (const filePath of listSourceFiles()) {
-    const file = path.join(SRC, filePath);
+  for (const file of sourceFiles(SRC)) {
+    const filePath = rel(file);
     const text = fs.readFileSync(file, 'utf8');
     for (const rule of Object.keys(PATTERNS) as Rule[]) {
       const n = countFileRule(rule, filePath, text);
