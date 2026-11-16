@@ -42,7 +42,8 @@ function git(root, args) {
 function loadDesignGuardCounts(root) {
   const sourcePath = path.join(root, GUARD_PATH);
   const source = fs.readFileSync(sourcePath, 'utf8');
-  const ts = createRequire(path.join(root, 'package.json'))('typescript');
+  // TypeScript is declared by the mobile app, whose guard this benchmark executes.
+  const ts = createRequire(path.join(root, 'apps/mobile/package.json'))('typescript');
   const compiled = ts.transpileModule(source, {
     compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 }
   }).outputText;
@@ -68,7 +69,12 @@ function loadDesignGuardCounts(root) {
   };
   vm.runInNewContext(compiled, sandbox, { filename: GUARD_PATH });
   if (typeof module.exports.countAll !== 'function') throw new Error('design guard countAll export was not found');
-  return module.exports.countAll();
+  if (typeof module.exports.listSourceFiles !== 'function') throw new Error('design guard source inventory export was not found');
+  return { counts: module.exports.countAll(), sourceFiles: module.exports.listSourceFiles(), typescriptVersion: ts.version };
+}
+
+export function hashSourceInputs(root, sourceFiles) {
+  return sourceFiles.map(file => ({ path: file, sha256: sha256(fs.readFileSync(path.join(root, 'apps/mobile/src', file))) }));
 }
 
 function compareRules(counts, baseline) {
@@ -103,10 +109,24 @@ export function resolveOutputPath(root, outputFile) {
     throw new Error('--output must be a repository-relative path');
   }
   const absoluteRoot = path.resolve(root);
+  const realRoot = fs.realpathSync(absoluteRoot);
   const destination = path.resolve(absoluteRoot, outputFile);
   const relative = path.relative(absoluteRoot, destination);
   if (!relative || relative === '..' || relative.startsWith(`..${path.sep}`) || path.isAbsolute(relative)) {
     throw new Error('--output must resolve to a file inside the repository');
+  }
+  let existingParent = path.dirname(destination);
+  const missingSegments = [];
+  while (!fs.existsSync(existingParent)) {
+    missingSegments.unshift(path.basename(existingParent));
+    const parent = path.dirname(existingParent);
+    if (parent === existingParent) throw new Error('--output parent cannot be resolved');
+    existingParent = parent;
+  }
+  const resolvedParent = path.resolve(fs.realpathSync(existingParent), ...missingSegments);
+  const resolvedRelative = path.relative(realRoot, resolvedParent);
+  if (resolvedRelative === '..' || resolvedRelative.startsWith(`..${path.sep}`) || path.isAbsolute(resolvedRelative)) {
+    throw new Error('--output parent must resolve to a directory inside the repository');
   }
   return destination;
 }
@@ -118,7 +138,7 @@ export function collectBaseline({ root = ROOT, outputFile, now = () => new Date(
   const guardSource = fs.readFileSync(path.join(absoluteRoot, GUARD_PATH));
   const baselineSource = fs.readFileSync(path.join(absoluteRoot, BASELINE_PATH));
   const scriptSource = fs.readFileSync(SCRIPT_PATH);
-  const counts = loadDesignGuardCounts(absoluteRoot);
+  const { counts, sourceFiles, typescriptVersion } = loadDesignGuardCounts(absoluteRoot);
   const baseline = JSON.parse(baselineSource.toString('utf8'));
   const report = {
     schemaVersion: 1,
@@ -134,6 +154,8 @@ export function collectBaseline({ root = ROOT, outputFile, now = () => new Date(
       evidenceClass: 'current-source-repro',
       path: GUARD_PATH,
       sha256: sha256(guardSource),
+      typescriptVersion,
+      sourceInputs: hashSourceInputs(absoluteRoot, sourceFiles),
       baselinePath: BASELINE_PATH,
       baselineSha256: sha256(baselineSource),
       baselineComparison: 'per-file counts; a missing baseline entry is treated as zero',
@@ -141,7 +163,7 @@ export function collectBaseline({ root = ROOT, outputFile, now = () => new Date(
       limitations: [
         'Counts are static source/design-guard measurements, not runtime performance or proof of visual quality, accessibility, or behavior.',
         'Regex rules may match comments and strings; AST rules are source heuristics implemented by the hashed guard file.',
-        'The report records status paths, not staged/unstaged file contents; source and baseline hashes identify the measured inputs.'
+        'The report records status paths, not staged/unstaged file contents; guard, baseline, and scanned source hashes identify the measured inputs.'
       ]
     },
     notMeasured: [

@@ -1,9 +1,10 @@
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
-import { collectBaseline, defaultOutputPath, resolveOutputPath } from '../../scripts/bench/allegra-baseline.mjs';
+import { collectBaseline, defaultOutputPath, hashSourceInputs, resolveOutputPath } from '../../scripts/bench/allegra-baseline.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const baselinePath = path.join(root, 'apps/mobile/src/designGuards.baseline.json');
@@ -27,6 +28,13 @@ test('benchmark reports source-backed guard counts without modifying its inputs'
   assert.match(report.tool.sha256, /^[0-9a-f]{64}$/);
   assert.match(report.designGuard.sha256, /^[0-9a-f]{64}$/);
   assert.match(report.designGuard.baselineSha256, /^[0-9a-f]{64}$/);
+  assert.match(report.designGuard.typescriptVersion, /^\d+\.\d+\.\d+/);
+  assert.ok(report.designGuard.sourceInputs.length > 0);
+  assert.deepEqual(report.designGuard.sourceInputs.map(input => input.path), [...report.designGuard.sourceInputs.map(input => input.path)].sort());
+  assert.ok(report.designGuard.sourceInputs.some(input => input.path.endsWith('.tsx')));
+  assert.ok(report.designGuard.sourceInputs.every(input => /^[0-9a-f]{64}$/.test(input.sha256)));
+  const countedFiles = new Set(Object.values(report.designGuard.rules).flatMap(rule => Object.keys(rule.countsByFile)));
+  assert.ok(report.designGuard.sourceInputs.some(input => !countedFiles.has(input.path)), 'hashes source files with zero counts');
   assert.equal(report.designGuard.evidenceClass, 'current-source-repro');
 
   const expectedRules = [
@@ -56,4 +64,44 @@ test('benchmark names output by the full commit and rejects paths outside the re
   assert.equal(resolveOutputPath(root, '.planning/v2/report.json'), path.join(root, '.planning/v2/report.json'));
   assert.throws(() => resolveOutputPath(root, '../outside.json'), /inside the repository/);
   assert.throws(() => resolveOutputPath(root, path.join(root, 'outside.json')), /repository-relative/);
+});
+
+test('source input hashes change when scanned file contents change', () => {
+  const temp = mkdtempSync(path.join(os.tmpdir(), 'allegra-benchmark-hash-'));
+  const sourceDir = path.join(temp, 'apps/mobile/src/components');
+  mkdirSync(sourceDir, { recursive: true });
+  const sourcePath = path.join(sourceDir, 'ZeroCount.tsx');
+  try {
+    writeFileSync(sourcePath, 'export const value = 1;\n');
+    const before = hashSourceInputs(temp, ['components/ZeroCount.tsx']);
+    writeFileSync(sourcePath, 'export const value = 2;\n');
+    const after = hashSourceInputs(temp, ['components/ZeroCount.tsx']);
+    assert.equal(before[0].path, 'components/ZeroCount.tsx');
+    assert.notEqual(before[0].sha256, after[0].sha256);
+  } finally {
+    rmSync(temp, { recursive: true, force: true });
+  }
+});
+
+test('output path rejects a repository directory symlink that resolves outside', t => {
+  const temp = mkdtempSync(path.join(os.tmpdir(), 'allegra-benchmark-path-'));
+  const repository = path.join(temp, 'repo');
+  const outside = path.join(temp, 'outside');
+  mkdirSync(repository);
+  mkdirSync(outside);
+  try {
+    try {
+      symlinkSync(outside, path.join(repository, 'escape'), process.platform === 'win32' ? 'junction' : 'dir');
+    } catch (error) {
+      if (['EPERM', 'EACCES', 'ENOTSUP', 'EINVAL'].includes(error.code)) {
+        t.skip(`directory symlinks are unavailable: ${error.code}`);
+        return;
+      }
+      throw error;
+    }
+    assert.throws(() => resolveOutputPath(repository, 'escape/report.json'), /resolve to a directory inside/);
+    assert.equal(resolveOutputPath(repository, 'reports/report.json'), path.join(repository, 'reports', 'report.json'));
+  } finally {
+    rmSync(temp, { recursive: true, force: true });
+  }
 });
