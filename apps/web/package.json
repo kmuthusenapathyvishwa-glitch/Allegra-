@@ -15,35 +15,35 @@
     "test": "node --import tsx --test --test-reporter=spec \"src/lib/**/*.test.ts\""
   },
   "dependencies": {
-    "@convex-dev/auth": "^0.0.95",
-    "@huggingface/transformers": "^4.3.1",
-    "@tailwindcss/postcss": "^4.3.3",
+    "@convex-dev/auth": "^0.0.98",
+    "@huggingface/transformers": "^4.3.2",
+    "@tailwindcss/postcss": "^4.3.5",
     "@vercel/analytics": "^2.0.1",
-    "@vercel/speed-insights": "^2.0.0",
-    "convex": "^1.46.0",
+    "@vercel/speed-insights": "^2.1.0",
+    "convex": "^1.49.0",
     "fflate": "^0.8.3",
     "kokoro-js": "^1.2.1",
     "lucide-react": "^0.468.0",
     "motion": "^12.23.24",
-    "next": "^16.3.5",
-    "onnxruntime-web": "^1.30.0",
+    "next": "^16.4.6",
+    "onnxruntime-web": "^1.31.1",
     "postcss": "^8.5.6",
     "qrcode": "^1.5.4",
-    "react": "^19.1.1",
-    "react-dom": "^19.1.1",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
     "tailwindcss": "^4.3.3"
   },
   "devDependencies": {
     "@eslint/js": "^9.35.0",
     "@types/node": "^24.5.0",
-    "@types/qrcode": "^1.5.5",
+    "@types/qrcode": "^1.5.6",
     "@types/react": "^19.1.13",
     "@types/react-dom": "^19.1.9",
     "eslint": "^9.35.0",
     "globals": "^16.4.0",
     "tsx": "^4.23.15",
     "typescript": "^5.9.2",
-    "typescript-eslint": "^8.43.0"
+    "typescript-eslint": "^8.72.2"
   },
   "license": "GPL-3.0-only"
 }
