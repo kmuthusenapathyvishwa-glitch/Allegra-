@@ -228,7 +228,7 @@ dependencies {
     implementation "com.squareup.okhttp3:okhttp:4.12.0"
 
     // Palette API for Module F (album art color extraction)
-    implementation "androidx.palette:palette-ktx:1.0.0"
+    implementation "androidx.palette:palette-ktx:1.1.0"
 
     // ViewPager2 backs the native Luvs reels pager (LuvsPagerView)
     implementation "androidx.viewpager2:viewpager2:1.1.0"
