@@ -33,12 +33,16 @@ export function parseAndroidRelease(json: unknown): AndroidRelease | null {
   if (typeof publishedRaw !== 'string' || !Array.isArray(assets)) return null;
   const publishedAt = new Date(publishedRaw);
   if (Number.isNaN(publishedAt.getTime())) return null;
-  const apk = assets.find(
+  const files = assets.filter(
     (asset): asset is { name: string; size?: unknown; browser_download_url: string } =>
       typeof asset === 'object' && asset !== null &&
       typeof (asset as { name?: unknown }).name === 'string' && (asset as { name: string }).name.toLowerCase().endsWith('.apk') &&
       typeof (asset as { browser_download_url?: unknown }).browser_download_url === 'string'
   );
+  // The release also holds retained rollback builds and the optional island add-on, and GitHub lists the
+  // rollbacks first: the download is always the app itself.
+  const apk = files.find(asset => asset.name.toLowerCase() === 'luvlyrics.apk')
+    ?? files.find(asset => !/rollback|island/i.test(asset.name));
   if (!apk) return null;
   const size = typeof apk.size === 'number' && apk.size > 0 ? apk.size : null;
   const version = typeof name === 'string' ? name.match(/\b(\d+\.\d+\.\d+)\b/)?.[1] ?? null : null;

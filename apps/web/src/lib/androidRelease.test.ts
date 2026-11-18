@@ -21,6 +21,17 @@ test('reads the real file, size, version and date from the release', () => {
   assert.equal(parsed?.publishedAt.toISOString(), '2026-10-01T16:51:09.000Z');
 });
 
+test('offers the app, not a rollback build or the island add-on, however GitHub orders the files', () => {
+  const apk = (name: string) => ({ name, size: 1_000, browser_download_url: `https://example.com/${name}` });
+  const assets = [
+    apk('LuvLyrics-rollback-1.68.2.apk'), apk('LuvLyrics-rollback-1.69.1.apk'), apk('LuvLyricsIsland.apk'), apk('LuvLyrics.apk'),
+  ];
+  assert.equal(parseAndroidRelease({ ...release, assets })?.url, 'https://example.com/LuvLyrics.apk');
+  // Without the exact name, still never a rollback or the add-on.
+  assert.equal(parseAndroidRelease({ ...release, assets: [apk('LuvLyrics-rollback-1.68.2.apk'), apk('LuvLyrics-1.70.0.apk')] })?.url, 'https://example.com/LuvLyrics-1.70.0.apk');
+  assert.equal(parseAndroidRelease({ ...release, assets: [apk('LuvLyrics-rollback-1.68.2.apk')] }), null);
+});
+
 test('a release without a version in its title still offers the file', () => {
   const parsed = parseAndroidRelease({ ...release, name: 'LuvLyrics — latest build' });
   assert.equal(parsed?.version, null);
