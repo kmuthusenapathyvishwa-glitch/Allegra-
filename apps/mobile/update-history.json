@@ -1,6 +1,19 @@
 {
   "entries": [
     {
+      "version": "1.70.2",
+      "description": "A much smaller download, with the same features",
+      "changelog": [
+        {
+          "title": "Improved",
+          "items": [
+            "The app is about 30 MB smaller to download and install",
+            "Removed an unused part that only older builds of Your DJ needed"
+          ]
+        }
+      ]
+    },
+    {
       "version": "1.70.1",
       "description": "Checking for updates works on a weak signal, and you can always download the latest version",
       "changelog": [
@@ -17,7 +30,9 @@
             "When the check fails, Updates offers to download the latest version straight away"
           ]
         }
-      ]
+      ],
+      "sourceCommit": "63824476ae639e7b87432befbcd2ec0acab629e0",
+      "rollbackAsset": "LuvLyrics-rollback-1.70.1.apk"
     },
     {
       "version": "1.70.0",
@@ -66,31 +81,6 @@
       ],
       "sourceCommit": "c2ca5e7a50d974678d7707b3df1374bb1843b9fa",
       "rollbackAsset": "LuvLyrics-rollback-1.69.1.apk"
-    },
-    {
-      "version": "1.69.0",
-      "description": "The player follows your finger, replayed songs use less data, and Stream has a clearer header",
-      "changelog": [
-        {
-          "title": "New",
-          "items": [
-            "Songs you stream are kept temporarily on your phone, so replaying them can use less data. Choose the space limit in Settings, Playback",
-            "The app tries to resume songs interrupted by a dropped connection",
-            "Use your own AI key on the website to translate lyrics or read their pronunciation"
-          ]
-        },
-        {
-          "title": "Improved",
-          "items": [
-            "The player follows your finger up and down, at any speed, and closes onto one mini player",
-            "Stream has your picture at the top left, with Devices and the LuvLyrics logo together at the top right",
-            "Songs and Playlists in Stream switch with one neat control",
-            "The app finds new versions reliably, so updates show up in About"
-          ]
-        }
-      ],
-      "sourceCommit": "1a6bb6ca9a870d9ffab38474fc337876fa306852",
-      "rollbackAsset": "LuvLyrics-rollback-1.69.0.apk"
     }
   ]
 }

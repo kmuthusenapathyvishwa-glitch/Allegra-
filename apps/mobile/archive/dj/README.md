@@ -13,4 +13,6 @@ Files: `DjScreen.tsx` (was `src/screens/`), `services/djApi.ts` and `services/lo
    and the More menu tile (`components/moreItems.ts`, `moreMenuPayload.ts`, the mascot in `MoreMenu.tsx`).
 3. Still in place on purpose: `StreamService.startDj*` / `applyDjUpcoming`, `sync/onlinePlaylist`, and the
    Kotlin `dj-mascot` drawing in `NativeMoreItemsView.kt`.
-4. Bump `expo.version`, then `npm run mobile:check`.
+4. Re-add `llama.rn` (it was removed in 1.70.2 and `localDj.ts` imports it): `npm install llama.rn` here, and its
+   plugin entry in `app.json` (`enableEntitlements`, `forceCxx20`, `enableOpenCL: false`). It adds about 30 MB to the APK.
+5. Bump `expo.version`, then `npm run mobile:check`.

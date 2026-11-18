@@ -2,7 +2,7 @@
   "expo": {
     "name": "LuvLyrics",
     "slug": "lyricflow",
-    "version": "1.70.1",
+    "version": "1.70.2",
     "orientation": "portrait",
     "icon": "./assets/luvlyrics-icon-white.png",
     "userInterfaceStyle": "dark",
@@ -71,14 +71,6 @@
       "expo-sqlite",
       "expo-audio",
       "expo-build-properties",
-      [
-        "llama.rn",
-        {
-          "enableEntitlements": true,
-          "forceCxx20": true,
-          "enableOpenCL": false
-        }
-      ],
       [
         "expo-image-picker",
         {
