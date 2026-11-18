@@ -2,7 +2,7 @@ jest.mock('@react-native-async-storage/async-storage', () => ({ getItem: jest.fn
 jest.mock('react-native', () => ({ AppState: { addEventListener: jest.fn(() => ({ remove: jest.fn() })) } }));
 
 import { widgetPins, type WidgetPlaylist } from './widgetData';
-import { isPlayableOffline, pinnedQueue } from './playPinned';
+import { pinnedQueue } from './playPinned';
 import { normalizeLibraryStartTab, normalizePinnedPlaylists, togglePinnedPlaylist, WIDGET_PIN_LIMIT } from '../store/settingsStore';
 import { holdTabFor, holdTarget, TAB_HOLD_MS } from '../navigation/tabHold';
 import { holdSummary, pinnedSummary } from '../components/settings/shortcutSummary';
@@ -38,11 +38,9 @@ describe('widget: pinned playlists (1.41.0)', () => {
     expect(togglePinnedPlaylist(['a'], 'b')).toEqual(['a', 'b']);
   });
 
-  it('plays only songs stored on this phone, so a tap works with no connection', () => {
-    expect(isPlayableOffline({ audioUri: 'file:///x.m4a' })).toBe(true);
-    expect(isPlayableOffline({ audioUri: 'https://cdn/x' })).toBe(false);
-    const queue = pinnedQueue([song('a', 'file:///a'), song('b', 'https://cdn/b'), song('c'), song('d', 'file:///d', { isHidden: true })]);
-    expect(queue.map(s => s.id)).toEqual(['a']);
+  it('plays downloaded and streamed songs in order, and leaves out hidden ones and ones with no address', () => {
+    const queue = pinnedQueue([song('a', 'file:///a'), song('b', 'https://cdn/b'), song('c'), song('d', 'file:///d', { isHidden: true }), song('e', 'content://media/e')]);
+    expect(queue.map(s => s.id)).toEqual(['a', 'b', 'e']);
   });
 });
 

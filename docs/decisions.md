@@ -65,9 +65,13 @@ credential to leak. Refresh tokens work the same.
 **Decided:** a sync step reads 50 rows, adds exact catalog matches, records a receipt per Spotify
 track and checkpoints after the library write is acknowledged. The daily job (Convex cron → API)
 works until a 45 s budget, answers `{ more }`, and Convex calls again up to 40 times. A playlist whose
-`snapshot_id` has not changed since its last finished scan is skipped.
+`snapshot_id` has not changed since its last finished scan is skipped. A receipt belongs to the library it
+was written for. When the listener deletes the playlist, the next manual transfer goes into a new
+library (`spotify-<id>-2`, `-3`, …) with no receipts, so every song comes back in Spotify's order (a
+deleted library keeps its rows, so its id is never reused); the daily job leaves a deleted playlist deleted.
 **Why:** receipts make retries and overlapping runs safe; the budget keeps each call well inside the
-function limit; the snapshot check makes an idle daily run nearly free.
+function limit; the snapshot check makes an idle daily run nearly free. Receipts that outlived the
+playlist made a re-import skip every song already receipted and leave the new playlist short.
 **Changes if:** a review screen for "close" matches is added to sync.
 
 ### "Exact" means same title, a shared artist and a matching length

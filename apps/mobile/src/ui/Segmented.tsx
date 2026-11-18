@@ -22,6 +22,11 @@ export interface SegmentedProps<T extends string> {
   label: string;
   /** A shorter capsule for headers. */
   compact?: boolean;
+  /**
+   * A position (0 = first option) that something else owns and moves, a swiped page for one. The plate and labels follow
+   * it, and the control does not spring on its own; without it the control springs to the chosen option.
+   */
+  position?: SharedValue<number>;
 }
 
 const Label: React.FC<{ index: number; position: SharedValue<number>; children: string }> = ({ index, position, children }) => {
@@ -31,16 +36,18 @@ const Label: React.FC<{ index: number; position: SharedValue<number>; children: 
   return <Animated.Text style={[Typography.secondary, styles.text, color]}>{children}</Animated.Text>;
 };
 
-export function Segmented<T extends string>({ value, options, onChange, label, compact = false }: SegmentedProps<T>) {
+export function Segmented<T extends string>({ value, options, onChange, label, compact = false, position: shared }: SegmentedProps<T>) {
   const reduce = useReducedMotion();
   const [width, setWidth] = useState(0);
   const cell = options.length > 0 ? Math.max(0, width - PAD * 2) / options.length : 0;
   const index = Math.max(0, options.findIndex(o => o.value === value));
-  const position = useSharedValue(index);
+  const own = useSharedValue(index);
+  const position = shared ?? own;
   useEffect(() => {
-    if (reduce) { position.value = index; return; }
-    position.value = withSpring(index, Motion.spring.open);
-  }, [index, reduce, position]);
+    if (shared) return;
+    if (reduce) { own.value = index; return; }
+    own.value = withSpring(index, Motion.spring.open);
+  }, [index, reduce, own, shared]);
   const plate = useAnimatedStyle(() => ({
     width: cell,
     opacity: cell > 0 ? 1 : 0,

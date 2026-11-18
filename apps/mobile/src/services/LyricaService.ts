@@ -6,13 +6,16 @@
 import { parseWordTags } from '@shared/wordSync';
 import { LyricLine } from '../types/song';
 import { EchoLyricsCascade } from './lyrics/EchoLyricsCascade';
-import { chooseLyricsFallback } from './lyrics/foundOnlineLyrics';
+import { chooseLyricsFallback, type FoundOnlineLyrics } from './lyrics/foundOnlineLyrics';
 import { fetchFoundOnlineLyrics } from './lyrics/foundOnlineLyricsApi';
 import { ProviderLyrics } from './lyrics/providers';
 
 const BASE_URL = 'https://test-0k.onrender.com/lyrics';
 const COLD_START_TIMEOUT_MS = 45_000;
 const PLAIN_IN_HAND_TIMEOUT_MS = 6_000;
+/** A backend that has not answered by now is asked beside the website's lyric sites, not before them. */
+const ONLINE_HEAD_START_MS = 3_000;
+const BACKEND_LATE = Symbol('backend-late');
 
 export interface LyricaResult {
   lyrics: string;
@@ -68,7 +71,7 @@ class LyricaService {
     artist: string,
     syncedOnly: boolean = false,
     duration?: number,
-    options: { skipEcho?: boolean; ref?: string; album?: string; language?: string; signal?: AbortSignal } = {},
+    options: { skipEcho?: boolean; skipFoundOnline?: boolean; ref?: string; album?: string; language?: string; signal?: AbortSignal } = {},
   ): Promise<LyricaResult | null> {
     try {
       const { cleanSong, cleanArtist } = cleanTitleArtist(song, artist);
@@ -112,27 +115,57 @@ class LyricaService {
       // With plain lyrics already in hand, the backend gets a short chance to beat them with
       // timestamps; without them it gets long enough to survive a cold start.
       const timeoutMs = echo ? PLAIN_IN_HAND_TIMEOUT_MS : COLD_START_TIMEOUT_MS;
+
+      // The website's lyric sites (Found online) are asked once, whenever first needed. A sleeping
+      // backend can hold a strategy for 45 s, so they start beside it after a short head start; once
+      // they have words the backend gets only a moment more to beat them with timestamps.
+      let onlineLookup: Promise<FoundOnlineLyrics | null> | null = null;
+      const online = (): Promise<FoundOnlineLyrics | null> => (onlineLookup ??= fetchFoundOnlineLyrics(onlineQuery));
+      const timers: ReturnType<typeof setTimeout>[] = [];
+      // A caller that asks the website itself (the picker) sets skipFoundOnline, so it is not asked twice.
+      const noOnline = syncedOnly || options.skipFoundOnline === true;
+      const backendLate = noOnline ? null : new Promise<typeof BACKEND_LATE>(resolve => {
+        timers.push(setTimeout(() => {
+          online().then(found => {
+            if (found) timers.push(setTimeout(() => resolve(BACKEND_LATE), PLAIN_IN_HAND_TIMEOUT_MS));
+          }, () => undefined);
+        }, ONLINE_HEAD_START_MS));
+      });
+
+      try {
       for (const strategy of strategies) {
         let url = `${BASE_URL}/?artist=${encodeURIComponent(cleanArtist)}&song=${encodeURIComponent(cleanSong)}&timestamps=${strategy.timestamps}&fast=${strategy.fast}&metadata=true`;
         if (duration) url += `&duration=${Math.floor(duration)}`;
         
         if (__DEV__) console.log(`[Lyrica] Trying ${strategy.label}`);
         
-        let result: LyricaResult | null;
+        let result: LyricaResult | null | typeof BACKEND_LATE;
         try {
-          result = await this.executeFetch(url, strategy.label, timeoutMs);
+          const attempt = this.executeFetch(url, strategy.label, timeoutMs);
+          if (backendLate) {
+            attempt.catch(() => null); // Losing the race must not leave an unhandled rejection.
+            result = await Promise.race([attempt, backendLate]);
+          } else {
+            result = await attempt;
+          }
         } catch (e) {
           // Backend down or timed out: keep any mobile plain result, then try the website's fallback.
           if (__DEV__) console.error('[Lyrica] Backend lookup failed:', e);
-          return this.withFoundOnlineFallback(echo ? this.fromProvider(echo) : null, onlineQuery, syncedOnly);
+          return this.withFoundOnlineFallback(echo ? this.fromProvider(echo) : null, online, noOnline);
+        }
+        if (result === BACKEND_LATE) {
+          return this.withFoundOnlineFallback(echo ? this.fromProvider(echo) : null, online, noOnline);
         }
         if (result) {
-          return this.withFoundOnlineFallback(result, onlineQuery, syncedOnly);
+          return this.withFoundOnlineFallback(result, online, noOnline);
         }
       }
-      
+
       if (__DEV__) console.log('[Lyrica] All strategies exhausted');
-      return this.withFoundOnlineFallback(echo ? this.fromProvider(echo) : null, onlineQuery, syncedOnly);
+      return this.withFoundOnlineFallback(echo ? this.fromProvider(echo) : null, online, noOnline);
+      } finally {
+        timers.forEach(clearTimeout);
+      }
     } catch (error) {
       console.error('[Lyrica] Fetch error:', error);
       throw error;
@@ -154,12 +187,11 @@ class LyricaService {
 
   private async withFoundOnlineFallback(
     current: LyricaResult | null,
-    query: { title: string; artist: string; duration?: number; ref?: string; album?: string; language?: string; signal?: AbortSignal },
-    syncedOnly: boolean,
+    online: () => Promise<FoundOnlineLyrics | null>,
+    noOnline: boolean,
   ): Promise<LyricaResult | null> {
-    if (syncedOnly || (current && this.hasTimestamps(current.lyrics))) return current;
-    const online = await fetchFoundOnlineLyrics(query);
-    return chooseLyricsFallback(current, online);
+    if (noOnline || (current && this.hasTimestamps(current.lyrics))) return current;
+    return chooseLyricsFallback(current, await online());
   }
 
   private async executeFetch(url: string, label: string, timeoutMs: number): Promise<LyricaResult | null> {

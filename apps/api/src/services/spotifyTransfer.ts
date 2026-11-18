@@ -124,39 +124,53 @@ export class SpotifyTransferService {
     const { token, generation } = await this.accessToken(userId);
     const source = await this.source(provider, token, playlistId);
     if (!source) throw new SpotifyApiError(404, 'Spotify could not find that playlist.');
-    // Liked Songs become Allegra likes; a playlist becomes its own library. Library ids allow only [A-Za-z0-9_-] (parseLibraryOps).
-    const now = Date.now(); const libraryId = liked ? SPOTIFY_LIKED_ID : `spotify-${playlistId}`;
+    const now = Date.now();
+    // Liked Songs become Allegra likes; a playlist becomes its own library (see libraryHome for which one).
+    const saveHome = liked ? null : saved ?? await this.store.playlist(userId, playlistId);
     if (skipUnchanged && saved?.lastSyncedAt && saved.offset === 0 && saved.scanSnapshotId === source.snapshotId) {
-      return { complete: true, added: 0, skipped: 0, reviewNeeded: 0, libraryId };
+      return { complete: true, added: 0, skipped: 0, reviewNeeded: 0, libraryId: saveHome?.libraryId ?? (liked ? SPOTIFY_LIKED_ID : libraryIdFor(playlistId)) };
     }
-    if (!(await this.store.savePlaylist({ userId, playlistId, name: source.name, snapshotId: source.snapshotId, total: source.total, libraryId, enabled: true, updatedAt: now }, generation))) throw connectionChanged();
+    const profile = await this.auth.getUser(userId);
+    if (!profile) throw new SpotifyApiError(401, 'Sign in again to continue this transfer.');
+    const home = liked ? { libraryId: SPOTIFY_LIKED_ID, removed: false } : libraryHome(playlistId, saveHome, new Set(profile.libraries.map(row => row.id)));
+    const libraryId = home.libraryId;
+    // The listener deleted the playlist this one was transferred into. Manual: bring it back whole, as a new library.
+    // Daily: leave it deleted (a nightly run must not undo a deletion); the listener's own transfer recreates it.
+    if (skipUnchanged && home.removed) return { complete: true, added: 0, skipped: 0, reviewNeeded: 0, libraryId };
+    // The playlist row keeps naming the old library until a step has written to the new one, so a failed first step
+    // is retried into the same new library instead of moving on to yet another.
+    if (!(await this.store.savePlaylist({ userId, playlistId, name: source.name, snapshotId: source.snapshotId, total: source.total, libraryId: saveHome?.libraryId ?? libraryId, enabled: true, updatedAt: now }, generation))) throw connectionChanged();
     const leaseToken = randomBytes(18).toString('base64url');
     let claimed = await this.store.claim(userId, playlistId, leaseToken, now, LEASE_MS, generation);
     if (!claimed) throw new SpotifyApiError(409, 'This playlist is already syncing. Try again shortly.');
     try {
       let offset = claimed.offset;
       // The items page carries no snapshot_id; the playlist listing does. Edited mid-scan -> restart (receipts make the rescan cheap).
-      if (offset > 0 && claimed.scanSnapshotId !== source.snapshotId) {
+      // So does a playlist whose library was deleted (the row still names the old one): the pages already scanned went there.
+      const moved = saveHome !== null && saveHome !== undefined && saveHome.libraryId !== libraryId;
+      if (offset > 0 && (moved || claimed.scanSnapshotId !== source.snapshotId)) {
         offset = 0;
         claimed = { ...claimed, added: 0, skipped: 0, reviewNeeded: 0 };
+        delete claimed.orderAt;
       }
       const page = liked ? await provider.likedItems(token, offset, BATCH) : await provider.items(token, playlistId, offset, BATCH);
       const ids = page.tracks.map(track => track.id);
-      const seen = await this.store.receipts(userId, playlistId, ids);
+      // Receipts say "saved to this library": a new library after a deletion starts with none, so every song is added again.
+      const seen = await this.store.receipts(userId, playlistId, ids, libraryId);
       const unseen = page.tracks.filter(track => !seen.has(track.id));
       const results = await this.matcher.match(unseen.map(toImportedTrack));
       const receiptRows: { trackId: string; libraryId: string }[] = [];
       const ops: LibraryOp[] = [];
-      const profile = await this.auth.getUser(userId);
-      if (!profile) throw new SpotifyApiError(401, 'Sign in again to continue this transfer.');
       const libraryExists = liked || profile.libraries.some(row => row.id === libraryId);
       if (!libraryExists) ops.push({ op: 'playlist_upsert', playlistId: libraryId, name: source.name.slice(0, 60), isPublic: false, at: now });
       const sourceCount = page.total <= offset ? 0 : Math.min(BATCH, page.total - offset);
       let added = claimed.added; const skipped = claimed.skipped + seen.size + Math.max(0, sourceCount - page.tracks.length); let reviewNeeded = claimed.reviewNeeded;
+      // Where each song sits in the playlist, in Spotify's own order (see placeInOrder).
+      const placed = liked ? null : placeInOrder(page.tracks, claimed.orderAt ?? 0);
       for (let i = 0; i < unseen.length; i++) {
         const track = unseen[i]!; const result = results[i];
         if (result?.confidence === 'exact' && result.song) {
-          const at = stableAddedAt(track.addedAt);
+          const at = placed?.at.get(track.id) ?? stableAddedAt(track.addedAt);
           ops.push(liked
             ? { op: 'like', ref: result.song.ref, song: result.song, origin: 'import', at }
             : { op: 'playlist_add', playlistId: libraryId, ref: result.song.ref, song: result.song, origin: 'import', at });
@@ -178,7 +192,7 @@ export class SpotifyTransferService {
       const finalOffset = offset + sourceCount;
       const complete = finalOffset >= page.total;
       const cumulativeAdded = added; const cumulativeSkipped = skipped; const cumulativeReview = reviewNeeded;
-      const ack = await this.store.checkpoint(userId, playlistId, leaseToken, { receipts: receiptRows, offset: finalOffset, snapshotId: source.snapshotId, total: page.total, added: cumulativeAdded, skipped: cumulativeSkipped, reviewNeeded: cumulativeReview, complete }, generation);
+      const ack = await this.store.checkpoint(userId, playlistId, leaseToken, { receipts: receiptRows, offset: finalOffset, snapshotId: source.snapshotId, total: page.total, added: cumulativeAdded, skipped: cumulativeSkipped, reviewNeeded: cumulativeReview, complete, libraryId, ...(placed ? { orderAt: placed.end } : {}) }, generation);
       if (!ack) throw new SpotifyApiError(409, 'This transfer step expired. Retry it safely.');
       return { complete, added: cumulativeAdded, skipped: cumulativeSkipped, reviewNeeded: cumulativeReview, libraryId };
     } finally { await this.store.release(userId, playlistId, leaseToken); }
@@ -270,6 +284,51 @@ function skipsForToday(error: unknown): boolean {
   return error instanceof SpotifyApiError && (error.status === 400 || error.status === 403 || error.status === 404);
 }
 function startOfUtcDay(at: number): number { return at - (at % 86_400_000); }
+
+/** The first library a Spotify playlist is transferred into. Library ids allow only [A-Za-z0-9_-] (parseLibraryOps). */
+export function libraryIdFor(playlistId: string): string { return `spotify-${playlistId}`; }
+
+/** The library after a deleted one: `spotify-<id>`, then `spotify-<id>-2`, `-3`... A deleted library keeps its rows. */
+export function nextLibraryId(libraryId: string): string {
+  const suffix = libraryId.match(/-(\d+)$/);
+  return suffix ? `${libraryId.slice(0, suffix.index)}-${Number(suffix[1]) + 1}` : `${libraryId}-2`;
+}
+
+/**
+ * Which library a playlist's songs go into. The one it last wrote to while that still exists. When the listener has
+ * deleted it, the playlist is `removed` and goes into a new library: deleting leaves the old library's rows behind
+ * (so reusing its id would bring back every old entry at its old place), and receipts for the old one say nothing
+ * about the new one. A playlist that never wrote anything (its first step failed) keeps its library.
+ */
+export function libraryHome(
+  playlistId: string,
+  saved: Pick<StoredSpotifyPlaylist, 'libraryId' | 'lastSyncedAt' | 'offset'> | null | undefined,
+  liveLibraryIds: ReadonlySet<string>
+): { libraryId: string; removed: boolean } {
+  const current = saved?.libraryId ?? libraryIdFor(playlistId);
+  if (liveLibraryIds.has(current)) return { libraryId: current, removed: false };
+  const wrote = saved !== null && saved !== undefined && (saved.lastSyncedAt !== undefined || saved.offset > 0);
+  if (!wrote) return { libraryId: current, removed: false };
+  // A step that wrote the next library and then failed to check in left it live: carry on into it.
+  const next = nextLibraryId(current);
+  return { libraryId: next, removed: !liveLibraryIds.has(next) };
+}
+
+/**
+ * Orders a page of Spotify rows as Spotify lists them. A library orders its items by `at`, and Spotify's `added_at` is
+ * not the playlist's order (a dragged song keeps its date) and repeats (a bulk add shares one). Each row gets its own
+ * `added_at` or one millisecond more than the row before, whichever is later: dates stay true for ordinary playlists,
+ * and an out-of-order row moves up just far enough to keep its place. `from` is the last value the previous page used.
+ */
+export function placeInOrder(tracks: readonly SpotifyTrack[], from: number): { at: Map<string, number>; end: number } {
+  const at = new Map<string, number>();
+  let last = from;
+  for (const track of tracks) {
+    last = Math.max(stableAddedAt(track.addedAt), last + 1);
+    at.set(track.id, last);
+  }
+  return { at, end: last };
+}
 
 function publicPlaylist(row: StoredSpotifyPlaylist) {
   return { id: row.playlistId, name: row.name, libraryId: row.libraryId, lastSyncedAt: row.lastSyncedAt ?? null, added: row.added, skipped: row.skipped, reviewNeeded: row.reviewNeeded, syncing: (row.leaseUntil ?? 0) > Date.now() };

@@ -24,11 +24,12 @@ import { usePlaylistStore } from '../store/playlistStore';
 import { LibraryStackParamList, RootStackParamList } from '../types/navigation';
 import { Playlist, Song } from '../types/song';
 import {
-  ConfirmSheet, EmptyState, GUTTER, IconButton, Placeholder, Sheet, SheetOption, Signal, Space, Tactile, Text,
+  Chip, ChipRow, ConfirmSheet, EmptyState, GUTTER, IconButton, Placeholder, Sheet, SheetOption, Signal, Space, Tactile, Text,
   useBottomClearance,
 } from '../ui';
 import { countOf } from '../utils/formatters';
 import { displayPlaylistName } from '../utils/sentenceCase';
+import { filterPlaylists, PLAYLIST_QUICK_ACTIONS, playlistsBody, type PlaylistQuickActionId } from './playlistsView';
 
 /** The grid's side padding and each card's margin: two folders share what is left of the width. */
 const GRID_PADDING = Space.sm;
@@ -111,6 +112,12 @@ export const PlaylistsScreen: React.FC<{ embedded?: boolean; query?: string }> =
     navigation.navigate('CreatePlaylist');
   };
 
+  const handleImport = () => {
+    navigation.navigate('Import');
+  };
+
+  const quickActionPress: Record<PlaylistQuickActionId, () => void> = { create: handleCreatePlaylist, import: handleImport };
+
   // A long press opens the playlist's actions; deleting asks first.
   const [selectedPlaylist, setSelectedPlaylist] = React.useState<Playlist | null>(null);
   const [actionsOpen, setActionsOpen] = React.useState(false);
@@ -138,6 +145,7 @@ export const PlaylistsScreen: React.FC<{ embedded?: boolean; query?: string }> =
   };
 
   const selectedName = selectedPlaylist ? displayPlaylistName(selectedPlaylist.name) : '';
+  const body = playlistsBody(isLoading, playlists.length);
 
   // Embedded in Library, the page behind (its background and header glow) shows through: a screen of its own here
   // drew an opaque box and a second glow that cut the Library's background off at this view's top edge.
@@ -155,10 +163,16 @@ export const PlaylistsScreen: React.FC<{ embedded?: boolean; query?: string }> =
             <InfoTour label="About playlists" steps={PLAYLISTS_TOUR} scene={playlistsScene} />
           </InfoTitleRow>
           </>}
-          <IconButton icon="add" label={PlaylistsStrings.createPlaylist} onPress={handleCreatePlaylist} />
         </View>
 
-        {isLoading && playlists.length === 0 ? (
+        {/* Always the first thing on the page, whatever the playlist count: nothing to scroll past. */}
+        <ChipRow gutter={GUTTER} style={styles.quickActions}>
+          {PLAYLIST_QUICK_ACTIONS.map(action => (
+            <Chip key={action.id} icon={action.icon} label={action.label} onPress={quickActionPress[action.id]} />
+          ))}
+        </ChipRow>
+
+        {body === 'placeholder' ? (
           <View style={[styles.grid, styles.placeholderGrid]}>
             {[0, 1, 2, 3].map(i => (
               <View key={i} style={styles.playlistCard}>
@@ -167,7 +181,7 @@ export const PlaylistsScreen: React.FC<{ embedded?: boolean; query?: string }> =
               </View>
             ))}
           </View>
-        ) : playlists.length === 0 ? (
+        ) : body === 'empty' ? (
           <EmptyState
             icon="folder-open-outline"
             title={PlaylistsStrings.noPlaylistsYet}
@@ -177,7 +191,7 @@ export const PlaylistsScreen: React.FC<{ embedded?: boolean; query?: string }> =
           />
         ) : (
           <FlatList
-            data={playlists.filter(item => !query || item.name.toLowerCase().includes(query.toLowerCase()))}
+            data={filterPlaylists(playlists, query)}
             key={`grid-${columns}`}
             numColumns={columns}
             keyExtractor={(item) => item.id}
@@ -243,6 +257,7 @@ const styles = StyleSheet.create({
     paddingVertical: Space.sm,
   },
   titleFlex: { flex: 1 },
+  quickActions: { flexGrow: 0 },
   grid: { paddingHorizontal: GRID_PADDING },
   placeholderGrid: { flexDirection: 'row', flexWrap: 'wrap' },
   placeholderLine: { marginTop: Space.sm },

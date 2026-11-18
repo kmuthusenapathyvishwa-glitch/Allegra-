@@ -33,14 +33,14 @@ export interface WidgetSnapshot {
   position: number;
   duration: number;
   playlists: WidgetPlaylist[];
-  /** Which playlist the playlist widget shows (cycled from the widget). */
-  playlistIndex: number;
   /** Up to four playlists pinned in Settings (or the first four, until some are pinned). A tap plays one. */
   pinned: WidgetPin[];
   /** The listener chose these (false: the widget is showing the first playlists as a suggestion). */
   pinnedChosen: boolean;
-  /** A short line after a tap that could not play ("Download “Sleep” to play it from here"). */
+  /** A short line after a tap that could not play, in the playlist widget's footer ("“Sleep” has no songs yet"). */
   notice: string | null;
+  /** Where tapping the notice goes: the app plays the playlist itself, when the background start was refused. */
+  noticeUri: string | null;
 }
 
 export interface WidgetPin {
@@ -57,10 +57,10 @@ export const EMPTY_SNAPSHOT: WidgetSnapshot = {
   position: 0,
   duration: 0,
   playlists: [],
-  playlistIndex: 0,
   pinned: [],
   pinnedChosen: false,
   notice: null,
+  noticeUri: null,
 };
 
 /**
@@ -107,7 +107,6 @@ export const widgetLink = {
     `lyricflow://widget/play?playlist=${encodeURIComponent(playlistId)}&song=${encodeURIComponent(songId)}`,
   playPlaylist: (playlistId: string) => `lyricflow://widget/play?playlist=${encodeURIComponent(playlistId)}`,
   nowPlaying: () => 'lyricflow://widget/now-playing',
-  share: () => 'lyricflow://widget/share',
 };
 
 export const formatClock = (seconds: number): string => {

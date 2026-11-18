@@ -7,7 +7,7 @@
  * tick while playing, for the progress bar. Nothing ticks while paused.
  */
 import { useEffect, useRef } from 'react';
-import { Linking, Platform, Share } from 'react-native';
+import { Linking, Platform } from 'react-native';
 import { requestWidgetUpdate } from 'react-native-android-widget';
 import React from 'react';
 import { usePlayerStore } from '../store/playerStore';
@@ -16,6 +16,7 @@ import { routeSongPick } from '../services/connect/playbackIntents';
 import { positionSV, durationSV } from '../playback/positionBus';
 import { openPlayerSheet } from '../navigation/playerSheet';
 import { NowPlayingWidget, PlaylistWidget } from './SongWidget';
+import { loadPinnedSongs, pinnedQueue } from './playPinned';
 import { WIDGET_NOW_PLAYING, WIDGET_PLAYLIST } from './widgetTaskHandler';
 import {
   readSnapshot,
@@ -61,11 +62,14 @@ const loadPlaylists = async (pinnedIds: readonly string[]): Promise<WidgetPlayli
   }));
   const shown = new Set(widgetPins(pinnedIds, base).pins.map(p => p.id));
   const { getPlaylistSongs } = await import('../database/playlistQueries');
+  const { getOnlinePlaylistSongs } = await import('../database/syncQueries');
   return Promise.all(base.map(async p => {
     if (p.cover || !shown.has(p.id)) return p;
     const songs = await getPlaylistSongs(p.id).catch(() => []);
+    // A playlist built on the website or another device has no song on this phone: its cover is a streaming entry's.
+    const online = songs.some(s => widgetCover(s.coverImageUri)) ? [] : await getOnlinePlaylistSongs(p.id).catch(() => []);
     const first = songs.find(s => widgetCover(s.coverImageUri));
-    return { ...p, cover: widgetCover(first?.coverImageUri), songs: songs.slice(0, WIDGET_PLAYLIST_SONGS).map(s => ({
+    return { ...p, cover: widgetCover(first?.coverImageUri) ?? widgetCover(online.find(row => widgetCover(row.artwork))?.artwork), songs: songs.slice(0, WIDGET_PLAYLIST_SONGS).map(s => ({
       id: s.id, title: s.title, artist: s.artist ?? '', cover: widgetCover(s.coverImageUri),
     })) };
   }));
@@ -107,6 +111,7 @@ export const useWidgetSync = (): void => {
         song: songId && title ? { id: songId, title, artist: artist ?? '', cover: widgetCover(cover) } : null,
         // A new song or state answers the last widget tap; its notice has done its job.
         notice: null,
+        noticeUri: null,
         isPlaying,
         liked,
         position: positionSV.value,
@@ -132,8 +137,8 @@ export const useWidgetLinks = (): void => {
       if (path === 'play') {
         const playlistId = params.get('playlist');
         if (!playlistId) return;
-        const { getPlaylistSongs } = await import('../database/playlistQueries');
-        const songs = await getPlaylistSongs(playlistId).catch(() => []);
+        // The playlist as its page lists it: songs on this phone and the streaming entries behind them.
+        const songs = pinnedQueue(await loadPinnedSongs(playlistId).catch(() => []));
         if (songs.length === 0) return;
         const songId = params.get('song');
         const index = Math.max(0, songId ? songs.findIndex(s => s.id === songId) : 0);
@@ -144,9 +149,6 @@ export const useWidgetLinks = (): void => {
         openPlayerSheet(songs[index].id);
       } else if (path === 'now-playing') {
         if (player.currentSongId) openPlayerSheet(player.currentSongId);
-      } else if (path === 'share') {
-        const song = player.currentSong;
-        if (song) Share.share({ message: `${song.title} — ${song.artist ?? ''} · via LuvLyrics` }).catch(() => {});
       }
     };
     // Navigation may not be ready on a cold start; give it a moment.

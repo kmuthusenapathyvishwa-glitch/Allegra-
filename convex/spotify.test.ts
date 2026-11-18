@@ -155,6 +155,30 @@ describe('Spotify scheduling and disconnect cleanup', () => {
     expect(await t.mutation(api.spotify.savePlaylist, { secret, userId, playlistId: 'p', name: 'Old step', snapshotId: 's', total: 0, libraryId: 'lib', enabled: true, updatedAt: 1, generation: before })).toBe(false);
   });
 
+  it('keeps receipts per library, so a playlist recreated after a deletion starts with none', async () => {
+    const t = convexTest(schema, modules);
+    const generation = await connect(t);
+    const step = { secret, userId, playlistId: 'p', name: 'Road', snapshotId: 's', total: 2, enabled: true, updatedAt: 2, generation };
+    expect(await t.mutation(api.spotify.savePlaylist, { ...step, libraryId: 'spotify-p' })).toBe(true);
+    const lease = async (token: string, now: number) => t.mutation(api.spotify.claimPlaylist, { secret, userId, playlistId: 'p', token, now, leaseMs: 60_000, generation });
+    const done = { secret, userId, playlistId: 'p', snapshotId: 's', total: 2, added: 2, skipped: 0, reviewNeeded: 0, now: 0, generation };
+    await lease('one', 10);
+    expect(await t.mutation(api.spotify.checkpoint, { ...done, token: 'one', now: 11, receipts: [{ trackId: 't1', libraryId: 'spotify-p' }, { trackId: 't2', libraryId: 'spotify-p' }], offset: 1, complete: false, libraryId: 'spotify-p', orderAt: 500 })).toBe(true);
+    expect((await t.query(api.spotify.playlistRow, { secret, userId, playlistId: 'p' }))?.orderAt).toBe(500);
+    expect(await t.query(api.spotify.playlistRow, { secret, userId, playlistId: 'nope' })).toBeNull();
+    expect(await t.query(api.spotify.receipts, { secret, userId, playlistId: 'p', trackIds: ['t1', 't2', 't3'], libraryId: 'spotify-p' })).toEqual(['t1', 't2']);
+    expect(await t.query(api.spotify.receipts, { secret, userId, playlistId: 'p', trackIds: ['t1', 't2'], libraryId: 'spotify-p-2' })).toEqual([]);
+    expect(await t.query(api.spotify.receipts, { secret, userId, playlistId: 'p', trackIds: ['t1', 't2'] })).toEqual(['t1', 't2']);
+
+    // The playlist was deleted and transferred again: the new step names the new library and takes the receipts over.
+    await lease('two', 20);
+    expect(await t.mutation(api.spotify.checkpoint, { ...done, token: 'two', now: 21, receipts: [{ trackId: 't1', libraryId: 'spotify-p-2' }], offset: 2, complete: true, libraryId: 'spotify-p-2' })).toBe(true);
+    expect(await t.query(api.spotify.receipts, { secret, userId, playlistId: 'p', trackIds: ['t1', 't2'], libraryId: 'spotify-p-2' })).toEqual(['t1']);
+    const row = await t.query(api.spotify.playlistRow, { secret, userId, playlistId: 'p' });
+    expect(row).toMatchObject({ libraryId: 'spotify-p-2', offset: 0 });
+    expect(row?.orderAt).toBeUndefined();
+  });
+
   it('honours a Retry-After hint within bounds and waits an hour without one', () => {
     expect(retryDelayMs('30')).toBe(60_000);
     expect(retryDelayMs('600')).toBe(600_000);

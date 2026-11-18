@@ -29,6 +29,7 @@ import { BrowseShelf } from '../components/browse/BrowseShelf';
 import { StreamUpdatesDropdown } from '../components/about/StreamUpdatesDropdown';
 import { ConnectDropdown } from '../components/connect/ConnectDropdown';
 import { GUTTER, MoodChips, QuickPicks, TrackItem } from '../components/stream/StreamHome';
+import { useSharedValue } from 'react-native-reanimated';
 import { RecentShelf, RecentSwitch } from '../components/stream/RecentShelf';
 import { ShimmerBlock } from '../components/stream/StreamItems';
 import { recentPlaylists, type RecentView } from '../services/stream/recentItems';
@@ -98,6 +99,8 @@ const StreamScreen: React.FC = () => {
   const [refreshing, setRefreshing] = useState(false);
   const livePicks = useLiveQuickPicks(feed?.quickPicks, !!feed);
   const [recentView, setRecentView] = useState<RecentView>('songs');
+  // One position (0 Songs, 1 Playlists) for the shelf and the header switch: a swipe on the shelf moves the plate too.
+  const recentPosition = useSharedValue(0);
   const playlists = usePlaylistStore(s => s.playlists);
   const [toast, setToast] = useState<string | null>(null);
   const [mood, setMood] = useState<string | null>(null);
@@ -403,6 +406,8 @@ const StreamScreen: React.FC = () => {
         <SectionHeading title="Jump back in" />
         <RecentShelf
           view={recentView}
+          position={recentPosition}
+          onChange={setRecentView}
           songs={listenAgain.map(track)}
           playlists={recentLists.map(list => ({ key: `playlist:${list.id}`, title: list.name,  artwork: list.coverImageUri, isCurrent: false }))}
           onPressSong={i => play(listenAgain, i)}
@@ -428,7 +433,7 @@ const StreamScreen: React.FC = () => {
     if (loading && !quick.length && !ytHome?.shelves.length) add('loading', <View style={styles.skeleton}>{[0, 1, 2, 3].map(i => <ShimmerBlock key={i} width="100%" height={64} />)}</View>);
     if (!loading && !quick.length && !ytHome?.shelves.length) add('catalog-unavailable', <View style={styles.emptyCard}><UiText variant="lead">Can\u2019t reach the catalog</UiText><UiText tone="secondary">Pull down to try again. Your saved songs still play.</UiText><PrimaryButton label="Open Library" icon="library-outline" onPress={openDownloads} /></View>);
     return sections;
-  }, [feed, track, play, queueNext, livePicks.entry, save, openMix, followedShelf, openItem, playYT, ytActions, ytHome, pendingSong, loading, openDownloads, playlists, recentView, navigation]);
+  }, [feed, track, play, queueNext, livePicks.entry, save, openMix, followedShelf, openItem, playYT, ytActions, ytHome, pendingSong, loading, openDownloads, playlists, recentView, recentPosition, navigation]);
 
   // The mood chips are the feed's first item, not a ListHeaderComponent: FlashList places its first item from the
   // header's measured offset, and a header that settled after that offset was read drew "Jump back in" over the
@@ -453,7 +458,7 @@ const StreamScreen: React.FC = () => {
         <View style={styles.header}>
           <View style={styles.headerLead}>
             <ProfileButton />
-            <RecentSwitch view={recentView} onChange={setRecentView} />
+            <RecentSwitch view={recentView} position={recentPosition} onChange={setRecentView} />
           </View>
           <View style={styles.headerActions}>
             <ConnectDropdown />

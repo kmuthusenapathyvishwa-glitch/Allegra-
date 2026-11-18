@@ -623,7 +623,9 @@ export default defineSchema({
     reviewNeeded: v.number(), lastSyncedAt: v.optional(v.number()), leaseUntil: v.optional(v.number()), leaseToken: v.optional(v.string()),
     enabled: v.boolean(), updatedAt: v.number(),
     /** Start time of the last daily run that finished or skipped this playlist; the run walks rows older than its start. */
-    dailyCheckedAt: v.optional(v.number())
+    dailyCheckedAt: v.optional(v.number()),
+    /** The playlist order key of the last song a running scan placed (ms): the next page starts above it, so the library keeps Spotify's order. */
+    orderAt: v.optional(v.number())
   }).index('by_userId_and_playlistId', ['userId', 'playlistId']).index('by_userId_and_updatedAt', ['userId', 'updatedAt'])
     .index('by_enabled_and_updatedAt', ['enabled', 'updatedAt'])
     .index('by_userId_and_enabled_and_dailyCheckedAt', ['userId', 'enabled', 'dailyCheckedAt']),

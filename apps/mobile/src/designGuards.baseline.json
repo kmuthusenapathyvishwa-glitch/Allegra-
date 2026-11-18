@@ -85,8 +85,7 @@
     "navigation/theme.ts": 2,
     "services/NativePalette.ts": 1,
     "services/stats/statsImage.ts": 4,
-    "services/stats/statsShare.ts": 8,
-    "widget/SongWidget.tsx": 25
+    "services/stats/statsShare.ts": 8
   },
   "componentTypeSize": {
     "App.tsx": 5,
@@ -135,7 +134,7 @@
     "components/SynchronizedLyrics.tsx": 1,
     "components/Toast.tsx": 1,
     "components/VoiceSearchCard.tsx": 10,
-    "widget/SongWidget.tsx": 13
+    "widget/SongWidget.tsx": 12
   },
   "motionLiteral": {
     "components/connect/ConnectRemotePlayer.tsx": 4,
