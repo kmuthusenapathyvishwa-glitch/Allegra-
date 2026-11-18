@@ -296,7 +296,18 @@ describe('fetchLatestBuild', () => {
 
   it('is null, not a throw, when nothing can be reached', async () => {
     global.fetch = jest.fn(async () => { throw new Error('offline'); }) as unknown as typeof fetch;
-    expect(await fetchLatestBuild()).toBeNull();
+    expect(await fetchLatestBuild(0)).toBeNull();
+  });
+
+  it('looks once more when the first look fails, as it does on the first request after the phone wakes', async () => {
+    let changelogAsks = 0;
+    serve({
+      [CHANGELOG_URL]: () => (++changelogAsks === 1 ? answer(null, {}, false) : answer(CHANGELOG, { 'last-modified': 'Fri, 13 Nov 2026 07:08:03 GMT' })),
+      [LATEST_APK_URL]: () => answer(null, { 'last-modified': 'Fri, 13 Nov 2026 07:07:50 GMT', 'content-length': '64831215' }),
+      'https://api.github.com/repos/peterish8/allegra/releases/tags/apk-latest': () => answer({ message: 'API rate limit exceeded' }, {}, false),
+    });
+    expect(await fetchLatestBuild(0)).toMatchObject({ version: '1.60.0', commit: COMMIT });
+    expect(changelogAsks).toBe(2);
   });
 });
 
