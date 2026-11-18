@@ -29,10 +29,10 @@
   },
   "dependencies": {
     "@auth/core": "^0.41.3",
-    "@convex-dev/auth": "^0.0.95",
+    "@convex-dev/auth": "^0.0.98",
     "@convex-dev/presence": "^0.4.0",
-    "@convex-dev/rate-limiter": "^0.4.0",
-    "convex": "^1.46.0"
+    "@convex-dev/rate-limiter": "^0.4.3",
+    "convex": "^1.49.0"
   },
   "workspaces": [
     "apps/api",
@@ -41,11 +41,11 @@
   ],
   "devDependencies": {
     "@edge-runtime/vm": "^5.0.0",
-    "@playwright/test": "^1.63.0",
-    "convex-test": "^0.0.60",
+    "@playwright/test": "^1.65.0",
+    "convex-test": "^0.0.69",
     "knip": "^5.88.1",
     "typescript": "5.9.3",
-    "vitest": "^5.0.2"
+    "vitest": "^5.1.0"
   },
   "license": "GPL-3.0-only",
   "overrides": {
