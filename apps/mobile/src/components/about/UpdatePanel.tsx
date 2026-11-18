@@ -289,7 +289,7 @@ export default function UpdatePanel({ visible, dropdown = false, onClose }: { vi
     : available ? { icon: 'arrow-down-circle', tone: 'wave', title: build?.version ? `Update available · ${build.version}` : 'Update available', sub: `Released ${releasedAgo(build.publishedAt)}${build.sizeBytes ? ` · ${formatSize(build.sizeBytes)}` : ''}` }
     : build && standing === 'current' ? { icon: 'checkmark-circle', tone: 'ok', title: "You're on the latest version", sub: `Version ${installedLabel}` }
     : build && standing === 'older' ? { icon: 'checkmark-circle', tone: 'ok', title: 'This phone is ahead of the release', sub: `Version ${installedLabel}. The latest release came out ${releasedAgo(build.publishedAt)}.` }
-    : checked ? { icon: 'alert-circle', tone: 'warn', title: "Couldn't check for updates", sub: 'The update server did not answer. Try again in a minute.' }
+    : checked ? { icon: 'alert-circle', tone: 'warn', title: "Couldn't check for updates", sub: supportsAppUpdates ? 'The update server did not answer. Try again, or download the latest version straight away.' : 'The update server did not answer. Try again in a minute.' }
     : { icon: 'refresh-circle', tone: 'plain', title: 'Check for updates', sub: `You are on ${installedLabel}` };
 
   const busy = checking || installing;
@@ -345,6 +345,11 @@ export default function UpdatePanel({ visible, dropdown = false, onClose }: { vi
         <Text style={styles.buttonText}>{checking ? 'Checking' : action.label}</Text>
       </Tactile>
     ) : !supportsAppUpdates ? <Text style={styles.body}>Installable updates are available in the Android app.</Text> : null}
+
+    {/* A failed look is not a reason to leave the listener stuck: the latest file has a fixed address. */}
+    {supportsAppUpdates && checked && !build && !checking && !downloading && !ready ? (
+      <Text style={styles.link} accessibilityRole="link" onPress={() => { download().catch(() => {}); }}>Download the latest version anyway</Text>
+    ) : null}
 
     {dropdown
       ? versionsToShow ? <RecentVersions entries={versionsToShow} onRollback={supportsAppUpdates ? requestRollback : undefined} /> : null

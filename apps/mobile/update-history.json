@@ -1,6 +1,25 @@
 {
   "entries": [
     {
+      "version": "1.70.1",
+      "description": "Checking for updates works on a weak signal, and you can always download the latest version",
+      "changelog": [
+        {
+          "title": "Fixed",
+          "items": [
+            "Checking for updates tries again once before it gives up, so a weak signal no longer shows the update server as down",
+            "The website's Android download now gives you the latest version, not an older one"
+          ]
+        },
+        {
+          "title": "Improved",
+          "items": [
+            "When the check fails, Updates offers to download the latest version straight away"
+          ]
+        }
+      ]
+    },
+    {
       "version": "1.70.0",
       "description": "A cleaner home-screen widget that plays your playlists, Spotify imports that come back whole, and a tidier Stream header and profile menu",
       "changelog": [
@@ -30,7 +49,9 @@
             "Removed leftover code the app no longer uses"
           ]
         }
-      ]
+      ],
+      "sourceCommit": "a8a9460fe4ce2055edcb8f3b6080cb5d3d55c5e1",
+      "rollbackAsset": "LuvLyrics-rollback-1.70.0.apk"
     },
     {
       "version": "1.69.1",
@@ -70,31 +91,6 @@
       ],
       "sourceCommit": "1a6bb6ca9a870d9ffab38474fc337876fa306852",
       "rollbackAsset": "LuvLyrics-rollback-1.69.0.apk"
-    },
-    {
-      "version": "1.68.2",
-      "description": "New versions show up in About again, and every change from 1.68.0 and 1.68.1 is in this build",
-      "changelog": [
-        {
-          "title": "New",
-          "items": [
-            "Connect ListenBrainz in Settings to keep a copy of what you listen to on your own profile",
-            "Your full history stays on this phone, and nothing is sent until you connect"
-          ]
-        },
-        {
-          "title": "Improved",
-          "items": [
-            "The app finds new versions reliably, so updates show up in About",
-            "Search tells you when the catalog cannot be reached, with a Try again button",
-            "The close button on the info card works",
-            "Small buttons are easier to tap, including the info buttons and filter chips",
-            "Text in Search and the Now Playing controls no longer gets cut off at larger sizes"
-          ]
-        }
-      ],
-      "sourceCommit": "65e90b5756edbc4c177e4613ae3479021fa691e0",
-      "rollbackAsset": "LuvLyrics-rollback-1.68.2.apk"
     }
   ]
 }

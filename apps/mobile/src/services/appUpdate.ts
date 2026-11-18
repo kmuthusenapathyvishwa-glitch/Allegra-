@@ -289,7 +289,18 @@ const fetchFromApi = async (): Promise<LatestBuild | null> => {
   return build;
 };
 
-export const fetchLatestBuild = async (): Promise<LatestBuild | null> => (await fetchFromAssets()) ?? (await fetchFromApi());
+const lookup = async (): Promise<LatestBuild | null> => (await fetchFromAssets()) ?? (await fetchFromApi());
+
+/**
+ * The first request after the phone wakes, or on a weak signal, often fails while the next one answers, so one
+ * miss is not an answer: look once more after a short pause before giving up.
+ */
+export const fetchLatestBuild = async (retryDelayMs: number = 1_500): Promise<LatestBuild | null> => {
+  const first = await lookup();
+  if (first) return first;
+  await new Promise<void>(resolve => setTimeout(resolve, retryDelayMs));
+  return lookup();
+};
 
 /** Reads the small recent-version copy file from the release downloads (no API request). */
 export const fetchReleaseHistory = async (): Promise<readonly ReleaseHistoryEntry[] | null> =>
