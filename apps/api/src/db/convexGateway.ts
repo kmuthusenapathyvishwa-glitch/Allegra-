@@ -25,6 +25,7 @@ export const CONVEX_QUERIES = [
   'blends:preview',
   'spotify:connection',
   'spotify:listPlaylists',
+  'spotify:playlistRow',
   'spotify:receipts',
   'spotify:dailyPlaylists',
   'verifiedLyrics:get',

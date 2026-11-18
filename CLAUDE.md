@@ -139,6 +139,15 @@ Each of these shipped once looking finished; the stories are in `.planning/LEARN
 - **A user reports a failure:** read `vercel logs` for the route before theorising.
 - **Then prove it live:** request the route on the deployment, open the page, use the build.
 
+## End of every session goal
+
+When a session goal is finished, run `/ponytail-session-allegra level=full` (the medium level:
+lite, **full**, ultra) before the final report, in the main session and in every subagent that
+changed code. It removes dead code, duplicates and leftovers from the session's change set,
+runs the gates for what changed, and holds the rest in `.planning/cleanup/DEFERRED.md`. Never
+clean files that were dirty before the session or belong to another task; use `mode=audit` when
+other work is still in flight in the same files. Put its one-line result in the report.
+
 ## Verifying
 
 ```

@@ -25,7 +25,6 @@ const PLAYER_PARTS: Record<string, string> = {
   'screens/NowPlayingScreen.tsx': "this phone's Now Playing, replaced by the remote player while another device plays",
   'components/player/UpNextPanel.tsx': "the queue under this phone's own player",
   'contexts/PlayerContext.tsx': "this phone's player events, and its lock-screen and headset buttons",
-  'widget/widgetTaskHandler.tsx': "the home-screen widget's buttons on this phone's own player",
   'playback/recovery.ts': "reloads this phone's song after a playback error",
   'services/luvLink/legacy/sync.ts': 'an Echo LuvLink room, which owns playback while it is open',
 };

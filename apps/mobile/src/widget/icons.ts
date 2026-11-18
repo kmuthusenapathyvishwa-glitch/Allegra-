@@ -12,7 +12,6 @@ export const Icon = {
   previous: (c: string) => svg('<path d="M19.5 5.6v12.8a.9.9 0 0 1-1.4.75l-9.2-6.4a.9.9 0 0 1 0-1.5l9.2-6.4a.9.9 0 0 1 1.4.75z"/><rect x="4.4" y="4.8" width="3" height="14.4" rx="1"/>', c),
   heart: (c: string) => svg('<path d="M12 20.6s-7.8-4.6-9.6-9.4C1.2 8 3.1 4.6 6.6 4.6c2.1 0 3.6 1.2 5.4 3.3 1.8-2.1 3.3-3.3 5.4-3.3 3.5 0 5.4 3.4 4.2 6.6-1.8 4.8-9.6 9.4-9.6 9.4z"/>', c),
   heartOutline: (c: string) => svg('<path fill="none" stroke="' + c + '" stroke-width="2" stroke-linejoin="round" d="M12 19.4s-7-4.2-8.6-8.4C2.4 8.2 4 5.6 6.8 5.6c1.9 0 3.3 1.2 5.2 3.4 1.9-2.2 3.3-3.4 5.2-3.4 2.8 0 4.4 2.6 3.4 5.4-1.6 4.2-8.6 8.4-8.6 8.4z"/>', c),
-  share: (c: string) => svg('<path fill="none" stroke="' + c + '" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M12 3.5v11M8 7.3l4-3.8 4 3.8M7 10.5H6a1.5 1.5 0 0 0-1.5 1.5v7A1.5 1.5 0 0 0 6 20.5h12a1.5 1.5 0 0 0 1.5-1.5v-7a1.5 1.5 0 0 0-1.5-1.5h-1"/>', c),
   chevronRight: (c: string) => svg('<path fill="none" stroke="' + c + '" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" d="M9.5 5.5 16 12l-6.5 6.5"/>', c),
   note: (c: string) => svg('<path d="M9 17.5V6.2a1 1 0 0 1 .78-.98l9-2A1 1 0 0 1 20 4.2v10.3a3 3 0 1 1-2-2.83V7.4l-7 1.56v8.54a3 3 0 1 1-2-2.83z"/>', c),
 };

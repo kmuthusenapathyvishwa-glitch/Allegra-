@@ -324,24 +324,7 @@ export const SpotifySyncPanel: React.FC<{ readonly accountKey: string | null; re
               </Tactile>
             </View>
 
-            <View style={styles.list}>
-              {sources.map((playlist, index) => (
-                <SourceRow
-                  key={playlist.id}
-                  playlist={playlist}
-                  index={index}
-                  selected={selected.has(playlist.id)}
-                  run={runs.get(playlist.id)}
-                  lastSyncedAt={tracked.get(playlist.id) ?? null}
-                  locked={syncing || busy}
-                  onToggle={() => { flyCover(playlist.id, !selected.has(playlist.id)); toggle(playlist.id); }}
-                  onReconnect={() => void connect()}
-                  coverRef={(view) => { if (view) covers.current.set(playlist.id, view); else covers.current.delete(playlist.id); }}
-                />
-              ))}
-              {sources.length === 0 && !busy ? <Text style={styles.sub}>Nothing on Spotify to transfer yet.</Text> : null}
-            </View>
-
+            {/* The transfer action leads the list (1.70.0): with dozens of playlists it used to sit below every one of them. */}
             <View style={styles.dock}>
               <SpotifyCrate sources={byId} ids={crate} liftId={runningId} transferring={syncing} slotRef={slotRef} />
               {syncing ? (
@@ -361,6 +344,24 @@ export const SpotifySyncPanel: React.FC<{ readonly accountKey: string | null; re
                   <Text style={styles.primaryText}>{queue.length === 0 ? 'Choose what to transfer' : `Transfer ${queue.length === 1 ? queue[0]!.name : `${queue.length} sources`}`}</Text>
                 </Tactile>
               )}
+            </View>
+
+            <View style={styles.list}>
+              {sources.map((playlist, index) => (
+                <SourceRow
+                  key={playlist.id}
+                  playlist={playlist}
+                  index={index}
+                  selected={selected.has(playlist.id)}
+                  run={runs.get(playlist.id)}
+                  lastSyncedAt={tracked.get(playlist.id) ?? null}
+                  locked={syncing || busy}
+                  onToggle={() => { flyCover(playlist.id, !selected.has(playlist.id)); toggle(playlist.id); }}
+                  onReconnect={() => void connect()}
+                  coverRef={(view) => { if (view) covers.current.set(playlist.id, view); else covers.current.delete(playlist.id); }}
+                />
+              ))}
+              {sources.length === 0 && !busy ? <Text style={styles.sub}>Nothing on Spotify to transfer yet.</Text> : null}
             </View>
 
             <View style={styles.setting}>

@@ -5,6 +5,7 @@
  */
 import { allegraVersions, DEFAULT_PROVIDER_ORDER, LYRICS_PROVIDERS, LyricsQuery, ProviderLyrics } from './providers';
 import { lyricsKind, LyricsOption, previewLines } from './lyricsChoice';
+import { fetchFoundOnlineLyrics } from './foundOnlineLyricsApi';
 import { lyricaService, LyricaResult } from '../LyricaService';
 import { SmartLyricMatcher } from '../SmartLyricMatcher';
 import { usePlayerStore } from '../../store/playerStore';
@@ -87,15 +88,23 @@ export async function searchEveryProvider(
     (LYRICS_PROVIDERS[name]?.(query) ?? Promise.resolve(null))
       .then((hit: ProviderLyrics | null) => report(hit ? lyricaService.fromProvider(hit) : null))
       .catch(() => undefined));
+  // The website's lyric sites (tamil2lyrics and its kind) are asked directly: behind the backend they showed up
+  // only after its cold-start wait, which read as "no lyrics" in the picker.
+  const online = fetchFoundOnlineLyrics({
+    title: query.title, artist: query.artist, duration: target.duration || undefined, ref: target.ref, album: target.album, language: target.language,
+  })
+    .then(site => report(site?.result ?? null))
+    .catch(() => undefined);
   const backend = lyricaService.fetchLyrics(query.title, query.artist, false, target.duration || undefined, {
     skipEcho: true,
+    skipFoundOnline: true,
     ref: target.ref,
     album: target.album,
     language: target.language,
   })
     .then(report)
     .catch(() => undefined);
-  await Promise.all([shared, ...echo, backend]);
+  await Promise.all([shared, ...echo, online, backend]);
   return found;
 }
 

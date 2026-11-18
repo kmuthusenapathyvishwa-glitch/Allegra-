@@ -25,6 +25,8 @@ export const PlaylistsStrings = {
   yourLibrary: 'Your library',
   noPlaylistsYet: 'No playlists yet',
   createPlaylist: 'Create playlist',
+  newPlaylist: 'New playlist',
+  importFromSpotify: 'Import from Spotify',
 };
 
 export const LikedSongsStrings = {

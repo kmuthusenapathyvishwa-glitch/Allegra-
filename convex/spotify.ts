@@ -189,20 +189,34 @@ export const releasePlaylist = mutation({
   }
 });
 
+/** One tracked playlist's row, or null: a transfer step reads which library it last wrote to. */
+export const playlistRow = query({
+  args: { secret: v.string(), userId: v.string(), playlistId: v.string() },
+  handler: async (ctx, args) => {
+    requireSecret(args.secret);
+    return await ctx.db.query('spotifyPlaylists').withIndex('by_userId_and_playlistId', q => q.eq('userId', args.userId).eq('playlistId', args.playlistId)).unique();
+  }
+});
+
+/**
+ * The tracks of `trackIds` a receipt says were saved. With `libraryId` only receipts written for that library count: a
+ * receipt is "this song is in that playlist", so it says nothing about a playlist created since the old one was deleted.
+ */
 export const receipts = query({
-  args: { secret: v.string(), userId: v.string(), playlistId: v.string(), trackIds: v.array(v.string()) },
+  args: { secret: v.string(), userId: v.string(), playlistId: v.string(), trackIds: v.array(v.string()), libraryId: v.optional(v.string()) },
   handler: async (ctx, args) => {
     requireSecret(args.secret);
     const found: string[] = [];
     for (const trackId of args.trackIds.slice(0, 50)) {
-      if (await ctx.db.query('spotifyReceipts').withIndex('by_userId_and_playlistId_and_spotifyTrackId', q => q.eq('userId', args.userId).eq('playlistId', args.playlistId).eq('spotifyTrackId', trackId)).unique()) found.push(trackId);
+      const receipt = await ctx.db.query('spotifyReceipts').withIndex('by_userId_and_playlistId_and_spotifyTrackId', q => q.eq('userId', args.userId).eq('playlistId', args.playlistId).eq('spotifyTrackId', trackId)).unique();
+      if (receipt && (args.libraryId === undefined || receipt.libraryId === args.libraryId)) found.push(trackId);
     }
     return found;
   }
 });
 
 export const checkpoint = mutation({
-  args: { secret: v.string(), userId: v.string(), playlistId: v.string(), token: v.string(), receipts: v.array(v.object({ trackId: v.string(), libraryId: v.string() })), offset: v.number(), snapshotId: v.string(), total: v.number(), added: v.number(), skipped: v.number(), reviewNeeded: v.number(), complete: v.boolean(), now: v.number(), generation: generationArg },
+  args: { secret: v.string(), userId: v.string(), playlistId: v.string(), token: v.string(), receipts: v.array(v.object({ trackId: v.string(), libraryId: v.string() })), offset: v.number(), snapshotId: v.string(), total: v.number(), added: v.number(), skipped: v.number(), reviewNeeded: v.number(), complete: v.boolean(), now: v.number(), generation: generationArg, libraryId: v.optional(v.string()), orderAt: v.optional(v.number()) },
   handler: async (ctx, args) => {
     requireSecret(args.secret);
     if (!(await liveConnection(ctx, args.userId, args.generation))) return false;
@@ -211,8 +225,13 @@ export const checkpoint = mutation({
     for (const receipt of args.receipts.slice(0, 50)) {
       const exists = await ctx.db.query('spotifyReceipts').withIndex('by_userId_and_playlistId_and_spotifyTrackId', q => q.eq('userId', args.userId).eq('playlistId', args.playlistId).eq('spotifyTrackId', receipt.trackId)).unique();
       if (!exists) await ctx.db.insert('spotifyReceipts', { userId: args.userId, playlistId: args.playlistId, spotifyTrackId: receipt.trackId, libraryId: receipt.libraryId, savedAt: args.now });
+      // The song went into a newer library (the old one was deleted): the receipt now belongs to that one.
+      else if (exists.libraryId !== receipt.libraryId) await ctx.db.patch('spotifyReceipts', exists._id, { libraryId: receipt.libraryId, savedAt: args.now });
     }
     await ctx.db.patch('spotifyPlaylists', playlist._id, {
+      // The library this step wrote to becomes the playlist's own only now that the step is done.
+      ...(args.libraryId !== undefined ? { libraryId: args.libraryId } : {}),
+      orderAt: args.complete ? undefined : args.orderAt,
       offset: args.complete ? 0 : Math.max(0, args.offset), scanSnapshotId: args.snapshotId, scanTotal: args.total,
       added: args.complete ? 0 : Math.max(0, args.added), skipped: args.complete ? 0 : Math.max(0, args.skipped), reviewNeeded: args.complete ? 0 : Math.max(0, args.reviewNeeded),
       ...(args.complete ? { lastSyncedAt: args.now } : {}), updatedAt: args.now, leaseUntil: undefined, leaseToken: undefined

@@ -48,6 +48,44 @@ describe('Found online fallback', () => {
       title: 'Song', artist: 'Artist', duration: 180, ref: 'saavn:track-1', album: 'Album', language: 'tamil',
     }));
   });
+
+  it('does not wait out a sleeping backend for the website lyrics', async () => {
+    jest.useFakeTimers();
+    try {
+      jest.spyOn(EchoLyricsCascade, 'fetchBest').mockResolvedValue(null);
+      // The backend never answers (a cold start): the request only ends when it is aborted.
+      jest.spyOn(global, 'fetch').mockImplementation((_url, init) => new Promise((_resolve, reject) => {
+        init?.signal?.addEventListener('abort', () => reject(new Error('aborted')));
+      }));
+      jest.spyOn(console, 'error').mockImplementation(() => undefined);
+      const online = { type: 'plain' as const, result: { lyrics: 'Website words', source: 'Found online' } };
+      mockFoundOnline.mockResolvedValue(online);
+
+      const pending = lyricaService.fetchLyrics('Rasathi', 'Artist', false, 285, { language: 'tamil' });
+      // 3 s head start + 6 s grace is far inside the backend's 45 s cold-start allowance.
+      await jest.advanceTimersByTimeAsync(10_000);
+      await expect(pending).resolves.toEqual(online.result);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('leaves the website alone for a caller that asks it itself', async () => {
+    jest.spyOn(EchoLyricsCascade, 'fetchBest').mockResolvedValue(null);
+    jest.spyOn(global, 'fetch').mockResolvedValue({ ok: false, status: 404, text: async () => '' } as Response);
+
+    await expect(lyricaService.fetchLyrics('Song', 'Artist', false, 180, { skipFoundOnline: true })).resolves.toBeNull();
+    expect(mockFoundOnline).not.toHaveBeenCalled();
+  });
+
+  it('asks the website once when the backend answers late with nothing', async () => {
+    jest.spyOn(EchoLyricsCascade, 'fetchBest').mockResolvedValue(null);
+    jest.spyOn(global, 'fetch').mockResolvedValue({ ok: false, status: 404, text: async () => '' } as Response);
+    mockFoundOnline.mockResolvedValue(null);
+
+    await expect(lyricaService.fetchLyrics('Song', 'Artist', false, 180)).resolves.toBeNull();
+    expect(mockFoundOnline).toHaveBeenCalledTimes(1);
+  });
 });
 
 describe('getLyricsFriendlyError', () => {

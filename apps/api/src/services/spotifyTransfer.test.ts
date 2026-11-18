@@ -4,16 +4,38 @@ import test from 'node:test';
 import type { AuthService } from '../auth/auth.js';
 import { SpotifyStore } from '../db/spotifyStore.js';
 import { SpotifyApiError, type SpotifyProvider, type SpotifyTrack } from '../providers/spotify.js';
-import { parseLibraryOps, type LibraryOp } from '../shared/library.js';
+import { applyLibraryOps, itemKey, parseLibraryOps, type LibraryOp, type LibraryRowsView, type PlaylistItemRow, type PlaylistRow } from '../shared/library.js';
 import type { ImportMatcher } from './importMatch.js';
-import { SpotifyTransferService } from './spotifyTransfer.js';
+import { libraryHome, libraryIdFor, nextLibraryId, placeInOrder, SpotifyTransferService } from './spotifyTransfer.js';
 import { SPOTIFY_LIKED_ID } from '../shared/spotify.js';
 
 const PLAYLIST = 'pl0000000001';
 
+/**
+ * The listener's library with the real rules (`applyLibraryOps`): deleting a playlist leaves its item rows behind, a
+ * newer change wins, and a playlist lists its songs by `addedAt`, then by the order they were applied.
+ */
+function libraryStore() {
+  const playlists = new Map<string, PlaylistRow>(); const items = new Map<string, PlaylistItemRow>(); let rev = 0;
+  const view: LibraryRowsView = { like: () => undefined, playlist: id => playlists.get(id), item: (id, ref) => items.get(itemKey(id, ref)) };
+  return {
+    apply(ops: readonly LibraryOp[]) {
+      const write = applyLibraryOps(view, ops, { now: Date.now(), rev });
+      for (const row of write.playlists) playlists.set(row.playlistId, row);
+      for (const row of write.items) items.set(itemKey(row.playlistId, row.ref), row);
+      rev = write.rev;
+      return { rejected: write.rejected };
+    },
+    libraries: () => [...playlists.values()].filter(row => !row.deleted).map(row => ({ id: row.playlistId })),
+    songs: (playlistId: string) => [...items.values()].filter(row => row.playlistId === playlistId && !row.deleted)
+      .sort((a, b) => a.addedAt - b.addedAt || a.rev - b.rev).map(row => row.ref),
+    remove(playlistId: string) { this.apply([{ op: 'playlist_delete', playlistId, at: Date.now() }]); }
+  };
+}
+
 /** 120 Spotify rows, three 50-row steps. `snapshot` is mutable so a test can edit the playlist. */
 function build() {
-  const state = { snapshot: 'snap-a', likedScope: true, failures: new Map<string, Error>(), refreshes: 0, onRefresh: async () => {}, liked: Array.from({ length: 60 }, (_, i): SpotifyTrack => ({ id: `l${i}`, title: `Loved ${i}`, artist: 'Artist', durationSec: 200, addedAt: '2026-03-01T00:00:00Z' })), tracks: Array.from({ length: 120 }, (_, i): SpotifyTrack => ({ id: `t${i}`, title: `Song ${i}`, artist: 'Artist', durationSec: 200, addedAt: '2026-01-01T00:00:00Z' })) };
+  const state = { snapshot: 'snap-a', likedScope: true, failApply: false, failures: new Map<string, Error>(), refreshes: 0, onRefresh: async () => {}, liked: Array.from({ length: 60 }, (_, i): SpotifyTrack => ({ id: `l${i}`, title: `Loved ${i}`, artist: 'Artist', durationSec: 200, addedAt: '2026-03-01T00:00:00Z' })), tracks: Array.from({ length: 120 }, (_, i): SpotifyTrack => ({ id: `t${i}`, title: `Song ${i}`, artist: 'Artist', durationSec: 200, addedAt: '2026-01-01T00:00:00Z' })) };
   const provider = {
     refresh: async () => { state.refreshes++; await state.onRefresh(); return { accessToken: 'a', expiresIn: 3600 }; },
     playlists: async () => [{ id: PLAYLIST, name: 'Road', snapshotId: state.snapshot, total: state.tracks.length }],
@@ -26,16 +48,22 @@ function build() {
     likedItems: async (_t: string, offset: number, limit = 50) => ({ tracks: state.liked.slice(offset, offset + limit), total: state.liked.length, snapshotId: '' })
   } as unknown as SpotifyProvider;
   const saved: LibraryOp[] = [];
+  const library = libraryStore();
   const auth = {
-    getUser: async () => ({ libraries: [] }),
-    library: { apply: async (_u: string, ops: readonly LibraryOp[]) => { saved.push(...ops); return { rejected: [] }; } }
+    getUser: async () => ({ libraries: library.libraries() }),
+    library: {
+      apply: async (_u: string, ops: readonly LibraryOp[]) => {
+        if (state.failApply) { state.failApply = false; throw new SpotifyApiError(503, 'Allegra could not save this transfer step.'); }
+        saved.push(...ops); return library.apply(ops);
+      }
+    }
   } as unknown as AuthService;
   const matcher = {
     match: async (rows: readonly { title: string }[]) => rows.map((row, index) => ({ index, confidence: 'exact', song: { ref: `saavn:${row.title}`, title: row.title, artist: 'Artist', artwork: '', duration: 200 } }))
   } as unknown as ImportMatcher;
   const store = new SpotifyStore(undefined, 'test-secret-0123456789');
   const service = new SpotifyTransferService(provider, 'client', 'http://localhost/cb', store, auth, matcher);
-  return { state, saved, store, service };
+  return { state, saved, store, service, library };
 }
 
 async function connect(store: SpotifyStore) {
@@ -282,4 +310,150 @@ test('playlist covers prefer the smallest sharp Spotify image and ignore other h
   ], next: null }), { status: 200 });
   const rows = await new SpotifyProvider('client', fetchImpl).playlists('token');
   assert.deepEqual(rows.map(row => row.imageUrl), ['https://i.scdn.co/image/300', 'https://mosaic.scdn.co/640/abc', null]);
+});
+
+// Owner report: import a Spotify playlist, delete it in Allegra, import it again, and only some songs came back. The
+// receipts that stop a rescan adding a song twice outlived the playlist they were written for, so the new playlist
+// skipped every song already receipted and kept only the ones that had never matched.
+const syncAll = async (service: SpotifyTransferService, id = PLAYLIST) => {
+  let step; do step = await service.sync('u', id); while (!step.complete);
+  return step;
+};
+const source = (count: number) => Array.from({ length: count }, (_, i) => `saavn:Song ${i}`);
+
+test('delete then re-import brings back every song, once, in Spotify’s order', async () => {
+  const { library, saved, store, service } = build(); await connect(store);
+  const first = await syncAll(service);
+  assert.equal(first.libraryId, libraryIdFor(PLAYLIST));
+  assert.deepEqual(library.songs(first.libraryId), source(120));
+
+  library.remove(first.libraryId);
+  const second = await syncAll(service);
+  assert.notEqual(second.libraryId, first.libraryId, 'a deleted library is not reused: its old rows are still stored');
+  assert.deepEqual(library.songs(second.libraryId), source(120), 'same count, same order');
+  assert.equal(second.added, 120);
+  assert.deepEqual(library.libraries().map(row => row.id), [second.libraryId]);
+  assert.equal((await store.playlist('u', PLAYLIST))!.libraryId, second.libraryId);
+  assert.notEqual(parseLibraryOps(saved.filter(op => op.op === 'playlist_upsert' || op.op === 'playlist_add').slice(-60)), null, 'the new library ids pass parseLibraryOps');
+
+  // Nothing further to do: a rescan of the new library adds nothing, and deleting it again works the same way.
+  const before = saved.length;
+  await syncAll(service);
+  assert.equal(adds(saved.slice(before)), 0, 'receipts still stop duplicates inside the new library');
+  library.remove(second.libraryId);
+  const third = await syncAll(service);
+  assert.deepEqual(library.songs(third.libraryId), source(120));
+  assert.equal(new Set([first.libraryId, second.libraryId, third.libraryId]).size, 3);
+});
+
+test('a song removed from a live playlist stays removed, and a rescan adds nothing', async () => {
+  const { library, store, service, saved } = build(); await connect(store);
+  const first = await syncAll(service);
+  library.apply([{ op: 'playlist_remove', playlistId: first.libraryId, ref: 'saavn:Song 7', at: Date.now() }]);
+  const before = saved.length;
+  await syncAll(service);
+  assert.equal(adds(saved.slice(before)), 0);
+  assert.equal(library.songs(first.libraryId).includes('saavn:Song 7'), false);
+});
+
+test('a playlist deleted part way through a transfer restarts from the first song in a new library', async () => {
+  const { library, store, service } = build(); await connect(store);
+  const partial = await service.sync('u', PLAYLIST);
+  assert.equal(partial.complete, false);
+  library.remove(partial.libraryId);
+  const done = await syncAll(service);
+  assert.notEqual(done.libraryId, partial.libraryId);
+  assert.deepEqual(library.songs(done.libraryId), source(120), 'the pages scanned before the deletion are not lost');
+  assert.equal(done.added, 120);
+});
+
+test('the library follows Spotify’s order even when added dates disagree with it', async () => {
+  const { state, library, store, service } = build(); await connect(store);
+  // A dragged playlist: later positions were added earlier, and some share a date.
+  state.tracks.forEach((track, i) => { state.tracks[i] = { ...track, addedAt: new Date(Date.UTC(2026, 0, 1) + (i % 3 === 0 ? 0 : (120 - i) * 3_600_000)).toISOString() }; });
+  const first = await syncAll(service);
+  assert.deepEqual(library.songs(first.libraryId), source(120));
+  library.remove(first.libraryId);
+  const second = await syncAll(service);
+  assert.deepEqual(library.songs(second.libraryId), source(120));
+});
+
+test('a failed first step into the new library is retried into the same library, not another', async () => {
+  const { state, library, store, service } = build(); await connect(store);
+  const first = await syncAll(service);
+  library.remove(first.libraryId);
+  state.failApply = true;
+  await assert.rejects(service.sync('u', PLAYLIST), (error: unknown) => error instanceof SpotifyApiError && error.status === 503);
+  const done = await syncAll(service);
+  assert.equal(done.libraryId, nextLibraryId(first.libraryId), 'no library was created by the failed step, so none is skipped');
+  assert.deepEqual(library.songs(done.libraryId), source(120));
+});
+
+test('a failed check-in after the new library was written carries on into it from the top', async () => {
+  const { library, store, service } = build(); await connect(store);
+  const first = await syncAll(service);
+  library.remove(first.libraryId);
+  const checkpoint = store.checkpoint.bind(store);
+  let lost = false;
+  store.checkpoint = async (userId, playlistId, token, value, generation) => {
+    if (!lost) { lost = true; return false; }
+    return checkpoint(userId, playlistId, token, value, generation);
+  };
+  await assert.rejects(service.sync('u', PLAYLIST), (error: unknown) => error instanceof SpotifyApiError && error.status === 409);
+  const done = await syncAll(service);
+  assert.deepEqual(library.songs(done.libraryId), source(120));
+  assert.equal(done.libraryId, nextLibraryId(first.libraryId));
+});
+
+test('a daily run does not bring back a playlist the listener deleted, and the next manual transfer does', async () => {
+  const { state, library, saved, store, service } = build(); await connect(store);
+  const first = await syncAll(service);
+  library.remove(first.libraryId);
+  state.snapshot = 'snap-b';
+  const before = saved.length;
+  assert.deepEqual(await service.dailyStep('u', 5), { more: false });
+  assert.equal(saved.length, before, 'no playlist and no songs were written');
+  assert.deepEqual(library.libraries(), []);
+  const again = await syncAll(service);
+  assert.deepEqual(library.songs(again.libraryId), source(120));
+});
+
+test('receipts are kept per library', async () => {
+  const { store } = build(); await connect(store);
+  await store.savePlaylist({ userId: 'u', playlistId: PLAYLIST, name: 'Road', snapshotId: 's', total: 2, libraryId: 'lib-a', enabled: true, updatedAt: 1 });
+  assert.ok(await store.claim('u', PLAYLIST, 'lease', Date.now(), 60_000));
+  await store.checkpoint('u', PLAYLIST, 'lease', { receipts: [{ trackId: 't1', libraryId: 'lib-a' }], offset: 1, snapshotId: 's', total: 2, added: 1, skipped: 0, reviewNeeded: 0, complete: false });
+  assert.deepEqual([...await store.receipts('u', PLAYLIST, ['t1', 't2'], 'lib-a')], ['t1']);
+  assert.deepEqual([...await store.receipts('u', PLAYLIST, ['t1', 't2'], 'lib-b')], []);
+  assert.deepEqual([...await store.receipts('u', PLAYLIST, ['t1', 't2'])], ['t1'], 'asking without a library reads every receipt, as before');
+});
+
+test('library ids and order keys', () => {
+  assert.equal(libraryIdFor(PLAYLIST), `spotify-${PLAYLIST}`);
+  assert.equal(nextLibraryId(`spotify-${PLAYLIST}`), `spotify-${PLAYLIST}-2`);
+  assert.equal(nextLibraryId(`spotify-${PLAYLIST}-2`), `spotify-${PLAYLIST}-3`);
+  assert.equal(nextLibraryId(`spotify-${PLAYLIST}-9`), `spotify-${PLAYLIST}-10`);
+  assert.notEqual(parseLibraryOps([{ op: 'playlist_upsert', playlistId: nextLibraryId(`spotify-${PLAYLIST}-9`), name: 'Road', at: 1 }]), null);
+
+  const live = new Set(['spotify-a']);
+  assert.deepEqual(libraryHome('a', undefined, new Set()), { libraryId: 'spotify-a', removed: false }, 'first transfer');
+  assert.deepEqual(libraryHome('a', { libraryId: 'spotify-a', offset: 0 }, new Set()), { libraryId: 'spotify-a', removed: false }, 'a first step that wrote nothing');
+  assert.deepEqual(libraryHome('a', { libraryId: 'spotify-a', offset: 0, lastSyncedAt: 5 }, live), { libraryId: 'spotify-a', removed: false }, 'still there');
+  assert.deepEqual(libraryHome('a', { libraryId: 'spotify-a', offset: 0, lastSyncedAt: 5 }, new Set()), { libraryId: 'spotify-a-2', removed: true }, 'deleted after a finished transfer');
+  assert.deepEqual(libraryHome('a', { libraryId: 'spotify-a', offset: 50 }, new Set()), { libraryId: 'spotify-a-2', removed: true }, 'deleted mid-scan');
+  assert.deepEqual(libraryHome('a', { libraryId: 'spotify-a', offset: 0, lastSyncedAt: 5 }, new Set(['spotify-a-2'])), { libraryId: 'spotify-a-2', removed: false }, 'the next library was written, the check-in was lost');
+});
+
+test('rows keep Spotify’s order, with each date kept unless it would put a row before the one above it', () => {
+  const row = (id: string, addedAt: string): SpotifyTrack => ({ id, title: id, artist: 'A', durationSec: 1, addedAt });
+  const day = (n: number) => `2026-01-0${n}T00:00:00Z`;
+  const page = placeInOrder([row('a', day(1)), row('b', day(1)), row('c', day(3)), row('d', day(2)), row('e', '')], 0);
+  const order = [...page.at.entries()].sort((x, y) => x[1] - y[1]).map(([id]) => id);
+  assert.deepEqual(order, ['a', 'b', 'c', 'd', 'e']);
+  assert.equal(page.at.get('a'), Date.parse(day(1)), 'a row that is already in order keeps its own date');
+  assert.equal(page.at.get('b'), Date.parse(day(1)) + 1);
+  assert.equal(page.at.get('c'), Date.parse(day(3)));
+  assert.equal(page.at.get('d'), Date.parse(day(3)) + 1, 'an older row after a newer one moves up by a millisecond');
+  const next = placeInOrder([row('f', day(1))], page.end);
+  assert.ok(next.at.get('f')! > page.end, 'the next page starts above the last row of this one');
 });

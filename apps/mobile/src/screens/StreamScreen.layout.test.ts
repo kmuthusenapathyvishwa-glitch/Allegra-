@@ -45,14 +45,26 @@ it('keeps Songs and Playlists in one fixed-width segmented control', () => {
   expect(recent).toContain("{ value: 'playlists', label: 'Playlists' }");
   expect(recent).toContain('switch: { width: 164, flexShrink: 1 }');
   // A shorter capsule than the full 48dp target, which the hit slop makes up.
-  expect(recent).toMatch(/label="Recent: songs or playlists" compact \/>/);
+  // The switch's plate follows the shelf's own position, so a swipe on the shelf moves it too.
+  expect(recent).toMatch(/label="Recent: songs or playlists" compact position=\{position\} \/>/);
 });
 
 it('slides Songs and Playlists on one track, on the same spring as the switch', () => {
   const recent = fs.readFileSync(path.join(__dirname, '../components/stream/RecentShelf.tsx'), 'utf8');
   expect(recent).toContain('withSpring(index, Motion.spring.open)');
   expect(recent).toMatch(/translateX: -position\.value \* width/);
-  expect(recent).not.toContain('runOnJS');
+});
+
+it('lets a swipe on the shelf drag the track and the switch together, then settle on one view', () => {
+  const recent = fs.readFileSync(path.join(__dirname, '../components/stream/RecentShelf.tsx'), 'utf8');
+  const screen = fs.readFileSync(path.join(__dirname, 'StreamScreen.tsx'), 'utf8');
+  // Vertical movement hands the touch to the feed's scroll.
+  expect(recent).toContain('.failOffsetY([-10, 10])');
+  expect(recent).toContain('swipePosition(dragFrom.value, e.translationX, width)');
+  expect(recent).toContain('swipeTarget(position.value, e.velocityX)');
+  // One shared position for the shelf and the header switch.
+  expect(screen).toContain('const recentPosition = useSharedValue(0)');
+  expect(screen).toContain('<RecentSwitch view={recentView} position={recentPosition}');
 });
 
 const flashList = () => nodes.find(node => ts.isJsxSelfClosingElement(node) && node.tagName.getText(file) === 'FlashList') as ts.JsxSelfClosingElement;

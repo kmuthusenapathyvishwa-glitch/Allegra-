@@ -2,9 +2,10 @@ import { createCipheriv, createDecipheriv, hkdfSync, randomBytes } from 'node:cr
 import type { ConvexGateway } from './convexGateway.js';
 
 export interface StoredSpotifyConnection { userId: string; spotifyUserId: string; refreshToken: string; accessToken?: string; accessExpiresAt?: number; dailyEnabled: boolean; connectedAt: number; updatedAt: number; generation?: number }
-export interface StoredSpotifyPlaylist { userId: string; playlistId: string; name: string; snapshotId: string; total: number; libraryId: string; offset: number; scanSnapshotId: string; scanTotal: number; added: number; skipped: number; reviewNeeded: number; lastSyncedAt?: number; leaseUntil?: number; leaseToken?: string; enabled: boolean; updatedAt: number; dailyCheckedAt?: number }
+export interface StoredSpotifyPlaylist { userId: string; playlistId: string; name: string; snapshotId: string; total: number; libraryId: string; offset: number; scanSnapshotId: string; scanTotal: number; added: number; skipped: number; reviewNeeded: number; lastSyncedAt?: number; leaseUntil?: number; leaseToken?: string; enabled: boolean; updatedAt: number; dailyCheckedAt?: number; orderAt?: number }
 export interface SpotifyOAuthState { userId: string; verifier: string; returnTo: 'web' | 'mobile' }
-export interface SpotifyCheckpoint { receipts: { trackId: string; libraryId: string }[]; offset: number; snapshotId: string; total: number; added: number; skipped: number; reviewNeeded: number; complete: boolean }
+/** `libraryId` becomes the playlist's own once the step is done; `orderAt` is where the next page's songs start in the library's order. */
+export interface SpotifyCheckpoint { receipts: { trackId: string; libraryId: string }[]; offset: number; snapshotId: string; total: number; added: number; skipped: number; reviewNeeded: number; complete: boolean; libraryId?: string; orderAt?: number }
 
 /** Spotify credentials are encrypted with a key distinct from the app's auth-signing key. */
 export class SpotifyStore {
@@ -12,7 +13,8 @@ export class SpotifyStore {
   private readonly memoryConnections = new Map<string, StoredSpotifyConnection>();
   private readonly memoryStates = new Map<string, { state: SpotifyOAuthState; expiresAt: number }>();
   private readonly memoryPlaylists = new Map<string, StoredSpotifyPlaylist>();
-  private readonly memoryReceipts = new Map<string, Set<string>>();
+  /** Per tracked playlist: Spotify track id -> the library the song was saved to. */
+  private readonly memoryReceipts = new Map<string, Map<string, string>>();
 
   public constructor(private readonly gateway: ConvexGateway | undefined, serverSecret: string) {
     this.key = Buffer.from(hkdfSync('sha256', serverSecret, 'allegra-spotify-v1', 'credential-encryption', 32));
@@ -93,6 +95,12 @@ export class SpotifyStore {
     return Array.isArray(raw) ? raw.map(parsePlaylist).filter((row): row is StoredSpotifyPlaylist => row !== null) : [];
   }
 
+  /** One tracked playlist's row, or null when it was never selected (or the account disconnected). */
+  public async playlist(userId: string, playlistId: string): Promise<StoredSpotifyPlaylist | null> {
+    if (this.gateway) return parsePlaylist(await this.gateway.query('spotify:playlistRow', { userId, playlistId }));
+    return this.memoryPlaylists.get(playlistKey(userId, playlistId)) ?? null;
+  }
+
   /** Enabled playlists this run (named by its start time) has not reached yet, least recently checked first. */
   public async dailyPlaylists(userId: string, runStartedAt: number, limit: number): Promise<StoredSpotifyPlaylist[]> {
     if (this.gateway) {
@@ -112,11 +120,11 @@ export class SpotifyStore {
     return true;
   }
 
-  public async savePlaylist(row: Omit<StoredSpotifyPlaylist, 'offset'|'scanSnapshotId'|'scanTotal'|'added'|'skipped'|'reviewNeeded'>, generation?: number): Promise<boolean> {
+  public async savePlaylist(row: Omit<StoredSpotifyPlaylist, 'offset'|'scanSnapshotId'|'scanTotal'|'added'|'skipped'|'reviewNeeded'|'orderAt'>, generation?: number): Promise<boolean> {
     if (this.gateway) return await this.gateway.mutation('spotify:savePlaylist', { ...row, ...(generation !== undefined ? { generation } : {}) }) === true;
     if (!this.memoryLive(row.userId, generation)) return false;
     const key = playlistKey(row.userId, row.playlistId); const previous = this.memoryPlaylists.get(key);
-    this.memoryPlaylists.set(key, { ...row, offset: previous?.offset ?? 0, scanSnapshotId: previous?.scanSnapshotId ?? row.snapshotId, scanTotal: previous?.scanTotal ?? row.total, added: previous?.added ?? 0, skipped: previous?.skipped ?? 0, reviewNeeded: previous?.reviewNeeded ?? 0, ...(previous?.lastSyncedAt !== undefined ? { lastSyncedAt: previous.lastSyncedAt } : {}), ...(previous?.dailyCheckedAt !== undefined ? { dailyCheckedAt: previous.dailyCheckedAt } : {}), ...(previous?.leaseUntil !== undefined && previous.leaseToken ? { leaseUntil: previous.leaseUntil, leaseToken: previous.leaseToken } : {}) });
+    this.memoryPlaylists.set(key, { ...row, offset: previous?.offset ?? 0, scanSnapshotId: previous?.scanSnapshotId ?? row.snapshotId, scanTotal: previous?.scanTotal ?? row.total, added: previous?.added ?? 0, skipped: previous?.skipped ?? 0, reviewNeeded: previous?.reviewNeeded ?? 0, ...(previous?.lastSyncedAt !== undefined ? { lastSyncedAt: previous.lastSyncedAt } : {}), ...(previous?.dailyCheckedAt !== undefined ? { dailyCheckedAt: previous.dailyCheckedAt } : {}), ...(previous?.orderAt !== undefined ? { orderAt: previous.orderAt } : {}),...(previous?.leaseUntil !== undefined && previous.leaseToken ? { leaseUntil: previous.leaseUntil, leaseToken: previous.leaseToken } : {}) });
     return true;
   }
 
@@ -134,12 +142,17 @@ export class SpotifyStore {
     if (row?.leaseToken === token) this.memoryPlaylists.set(key, withoutLease(row));
   }
 
-  public async receipts(userId: string, playlistId: string, trackIds: readonly string[]): Promise<Set<string>> {
+  /**
+   * Which of `trackIds` were saved to `libraryId` already. A receipt says "this song is in that playlist", so one written
+   * for a library that has since been deleted must not make a new library skip the song.
+   */
+  public async receipts(userId: string, playlistId: string, trackIds: readonly string[], libraryId?: string): Promise<Set<string>> {
     if (this.gateway) {
-      const raw = await this.gateway.query('spotify:receipts', { userId, playlistId, trackIds: trackIds.slice(0, 50) });
+      const raw = await this.gateway.query('spotify:receipts', { userId, playlistId, trackIds: trackIds.slice(0, 50), ...(libraryId !== undefined ? { libraryId } : {}) });
       return new Set(Array.isArray(raw) ? raw.filter((id): id is string => typeof id === 'string') : []);
     }
-    const known = this.memoryReceipts.get(playlistKey(userId, playlistId)) ?? new Set(); return new Set(trackIds.filter(id => known.has(id)));
+    const known = this.memoryReceipts.get(playlistKey(userId, playlistId)) ?? new Map<string, string>();
+    return new Set(trackIds.filter(id => known.has(id) && (libraryId === undefined || known.get(id) === libraryId)));
   }
 
   public async checkpoint(userId: string, playlistId: string, token: string, value: SpotifyCheckpoint, generation?: number): Promise<boolean> {
@@ -148,8 +161,12 @@ export class SpotifyStore {
     if (!this.memoryLive(userId, generation)) return false;
     const key = playlistKey(userId, playlistId); const row = this.memoryPlaylists.get(key);
     if (!row || row.leaseToken !== token || (row.leaseUntil ?? 0) <= now) return false;
-    const ids = this.memoryReceipts.get(key) ?? new Set<string>(); for (const receipt of value.receipts) ids.add(receipt.trackId); this.memoryReceipts.set(key, ids);
-    this.memoryPlaylists.set(key, { ...withoutLease(row), offset: value.complete ? 0 : value.offset, scanSnapshotId: value.snapshotId, scanTotal: value.total, added: value.complete ? 0 : value.added, skipped: value.complete ? 0 : value.skipped, reviewNeeded: value.complete ? 0 : value.reviewNeeded, ...(value.complete ? { lastSyncedAt: now } : {}), updatedAt: now });
+    const ids = this.memoryReceipts.get(key) ?? new Map<string, string>(); for (const receipt of value.receipts) ids.set(receipt.trackId, receipt.libraryId); this.memoryReceipts.set(key, ids);
+    const orderAt = value.complete ? undefined : value.orderAt;
+    const next = { ...withoutLease(row), ...(value.libraryId !== undefined ? { libraryId: value.libraryId } : {}), offset: value.complete ? 0 : value.offset, scanSnapshotId: value.snapshotId, scanTotal: value.total, added: value.complete ? 0 : value.added, skipped: value.complete ? 0 : value.skipped, reviewNeeded: value.complete ? 0 : value.reviewNeeded, ...(value.complete ? { lastSyncedAt: now } : {}), updatedAt: now };
+    // A finished scan forgets where it stood; the next one starts from the top.
+    delete next.orderAt;
+    this.memoryPlaylists.set(key, orderAt !== undefined ? { ...next, orderAt } : next);
     return true;
   }
 
@@ -176,5 +193,5 @@ function record(value: unknown): Record<string, unknown> | null { return typeof 
 function number(value: unknown): number | undefined { return typeof value === 'number' && Number.isFinite(value) ? value : undefined; }
 function parsePlaylist(value: unknown): StoredSpotifyPlaylist | null {
   const r = record(value); if (!r || typeof r.userId !== 'string' || typeof r.playlistId !== 'string' || typeof r.name !== 'string' || typeof r.libraryId !== 'string') return null;
-  return { userId: r.userId, playlistId: r.playlistId, name: r.name, libraryId: r.libraryId, snapshotId: typeof r.snapshotId === 'string' ? r.snapshotId : '', total: number(r.total) ?? 0, offset: number(r.offset) ?? 0, scanSnapshotId: typeof r.scanSnapshotId === 'string' ? r.scanSnapshotId : '', scanTotal: number(r.scanTotal) ?? 0, added: number(r.added) ?? 0, skipped: number(r.skipped) ?? 0, reviewNeeded: number(r.reviewNeeded) ?? 0, ...(number(r.lastSyncedAt) !== undefined ? { lastSyncedAt: number(r.lastSyncedAt)! } : {}), ...(number(r.leaseUntil) !== undefined ? { leaseUntil: number(r.leaseUntil)! } : {}), ...(typeof r.leaseToken === 'string' ? { leaseToken: r.leaseToken } : {}), enabled: r.enabled === true, updatedAt: number(r.updatedAt) ?? 0, ...(number(r.dailyCheckedAt) !== undefined ? { dailyCheckedAt: number(r.dailyCheckedAt)! } : {}) };
+  return { userId: r.userId, playlistId: r.playlistId, name: r.name, libraryId: r.libraryId, snapshotId: typeof r.snapshotId === 'string' ? r.snapshotId : '', total: number(r.total) ?? 0, offset: number(r.offset) ?? 0, scanSnapshotId: typeof r.scanSnapshotId === 'string' ? r.scanSnapshotId : '', scanTotal: number(r.scanTotal) ?? 0, added: number(r.added) ?? 0, skipped: number(r.skipped) ?? 0, reviewNeeded: number(r.reviewNeeded) ?? 0, ...(number(r.lastSyncedAt) !== undefined ? { lastSyncedAt: number(r.lastSyncedAt)! } : {}), ...(number(r.leaseUntil) !== undefined ? { leaseUntil: number(r.leaseUntil)! } : {}), ...(typeof r.leaseToken === 'string' ? { leaseToken: r.leaseToken } : {}), enabled: r.enabled === true, updatedAt: number(r.updatedAt) ?? 0, ...(number(r.dailyCheckedAt) !== undefined ? { dailyCheckedAt: number(r.dailyCheckedAt)! } : {}), ...(number(r.orderAt) !== undefined ? { orderAt: number(r.orderAt)! } : {}) };
 }
